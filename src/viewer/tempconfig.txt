@@ -1,0 +1,9 @@
+/home/eastfold/data/reOrganize/JuergenDataset/table-object11/data/s031.bmf
+/home/eastfold/data/reOrganize/JuergenDataset/table-object11
+35
+205
+/home/eastfold/data/reOrganize/JuergenDataset/table-object11/data/calib_TOF.txt
+calib_RGB.txt
+/home/eastfold/data/reOrganize/JuergenDataset/table-object11/data/model.dat
+/home/eastfold/data/reOrganize/JuergenDataset/table-object11/out031_1
+/home/eastfold/data/reOrganize/JuergenDataset/processed_data/table-object/joints_rgb/
