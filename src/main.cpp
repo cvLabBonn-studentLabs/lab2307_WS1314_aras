@@ -21,7 +21,10 @@ timer::Timer t;
 #endif
 
 const float infinity = 99999.9f;
+static cv::Mat depth_image;
+static mesher::Mesh mesh(pose::kMeshDistanceThreshold, pose::kNumInterestPoints);
 
+// FIXME: consider removal
 void mark_body_part(cv::Mat& image, cv::Point centre, classifier::BodyPart body_part) {
 
 	cv::Scalar colour;
@@ -41,6 +44,7 @@ void mark_body_part(cv::Mat& image, cv::Point centre, classifier::BodyPart body_
 		break;
 	case classifier::ZERO:
 		negative = true;
+		//colour = cv::Scalar(0, 0, 0);
 		break;
 	default:
 		negative = true;
@@ -68,6 +72,18 @@ float recall(float tp, float fn) {
 	return tp/(tp + fn);
 }
 
+// FIXME: consider removal
+#ifdef DEBUG
+static void onMouse( int event, int x, int y, int, void* )
+{
+    if( event != cv::EVENT_LBUTTONDOWN )
+        return;
+
+    std::cout << "(" << x << ", " << y << ")" << "= " << depth_image.at<float>(y, x)
+    			<< ", CC: " << mesh.get_cc_index(y*depth_image.cols + x) << std::endl;
+}
+#endif
+
 int main_(int argc, char * argv[]) {
 	io::DataIO data(io::Bonn);
 
@@ -87,7 +103,6 @@ int main(int argc, char * argv[]) {
 	const int stop_at_frame = 200;
 	const float distance_threshold = 25.f;
 	const int num_attr = 1681;
-	const int K = pose::kNumInterestPoints;
 
 	int head_fp = 0;
 	int head_tp = 0;
@@ -113,8 +128,8 @@ int main(int argc, char * argv[]) {
 
 	io::DataIO data(io::kCurrentDataset);
 	classifier::ClassifierSVM svm(num_attr);
-	svm.read_model("/media/DATA/MAINF2307/data/Stanford_training/head_hands/data.scale.model");
-	//svm.read_model("/home/neek/coding/mainf2307/data/bonn/training.scale.model");
+	//svm.read_model("/media/DATA/MAINF2307/data/Stanford_training/head_hands/data.scale.model");
+	svm.read_model("data/bonn/data.model");
 
 	opflow::OFTensor<float> aImage1, aImage2;
 	opflow::OFTensor<float> aForward, aBackward;
@@ -122,7 +137,7 @@ int main(int argc, char * argv[]) {
 	/******* DATA EXTRACTION *******/
 	//data.extract_data();
 
-	cv::Mat depth_image, depth_image_prev, rgb_image;
+	cv::Mat depth_image_prev, rgb_image;
 //	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
 //	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_rgb(new pcl::PointCloud<pcl::PointXYZRGB>());
 
@@ -165,24 +180,11 @@ std::cout << "(BENCHMARKING) Reading data: " << t.duration() << "ms" << std::end
 		data.get_ground_truth(centre_truth_head, centre_truth_left_hand, centre_truth_right_hand,
 										centre_truth_left_foot, centre_truth_right_foot);
 
-		// Converting the image for display purposes
+		// To remove: converting the image for display purposes
 		cv::Mat depth_image_flow, depth_image_display;
 		cv::normalize(depth_image, depth_image_flow, 0.0, 255.0, cv::NORM_MINMAX);
 		depth_image_flow.convertTo(depth_image_display, CV_8U);
 		cv::cvtColor(depth_image_display, depth_image_display, CV_GRAY2RGB);
-
-		//pcl::PointCloud<pcl::PointXYZ>::Ptr result(new pcl::PointCloud<pcl::PointXYZ>());
-
-		/******** Downsampling of the cloud ********/
-//#ifdef BENCHMARK
-//t.start();
-//#endif
-//		mesher::downsample(cloud, result, pose::kDownsampleCellSize);
-//#ifdef BENCHMARK
-//t.stop();
-//std::cout << "(BENCHMARKING) Downsampling of the cloud: " << t.duration() << "ms" <<  std::endl;
-//#endif
-		/******************************************/
 
 		/************** Optical flow **************/
 		cv::Mat image_of(depth_image.size(), CV_32F, 0.f);
@@ -202,12 +204,12 @@ ldof(aImage1, aImage2, aForward, aBackward);
 t.stop();
 std::cout << "(BENCHMARKING) Optical Flow: " << t.duration() << "ms" << std::endl;
 #endif
-			cv::Mat image_f(cv::Size(aForward.xSize(), aForward.ySize()), CV_32F);
-			cv::Mat image_b(cv::Size(aBackward.xSize(), aBackward.ySize()), CV_32F);
+				cv::Mat image_f(cv::Size(aForward.xSize(), aForward.ySize()), CV_32F);
+				cv::Mat image_b(cv::Size(aBackward.xSize(), aBackward.ySize()), CV_32F);
 
-			aForward.writeToMat(image_f);
-			aBackward.writeToMat(image_b);
-			opflow::merge_flows(image_f, image_b, image_of);
+				aForward.writeToMat(image_f);
+				aBackward.writeToMat(image_b);
+				opflow::merge_flows(image_f, image_b, image_of);
 			}
 
 			aImage1 = aImage2;
@@ -222,12 +224,9 @@ std::cout << "(BENCHMARKING) Optical Flow: " << t.duration() << "ms" << std::end
 #ifdef BENCHMARK
 t.start();
 #endif
-		mesher::Mesh mesh(pose::kMeshDistanceThreshold, K);
+		//mesher::Mesh mesh(pose::kMeshDistanceThreshold, pose::kNumInterestPoints);
+ 	 	mesh = mesher::Mesh(pose::kMeshDistanceThreshold, pose::kNumInterestPoints);
 		mesh.compute(depth_image, data.getScaleZ(), image_of);
-		//mesh.set_pointcloud(result);
-		//mesh.set_zfilter(40.f, 60.f);
-		//mesh.compute();
-
 #ifdef BENCHMARK
 t.stop();
 std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::endl;
@@ -246,12 +245,13 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 
 		// for prediction step
 		depth_image.convertTo(depth_image, CV_32F);
-		cv::normalize(depth_image, depth_image, -1.0, 1.0, cv::NORM_MINMAX);
+		cv::normalize(depth_image, depth_image, 0.f, 1.f, cv::NORM_MINMAX);
 //		mesh.mark_centroids(depth_image_display, 1.0);
 //
 		keyframe::Keyframe kframe(depth_image);
 //		cv::imshow("Depth image", depth_image);
 //		cv::waitKey(0);
+		std::cerr << "num of keypoints: " << keypoints.size() << std::endl;
 
 		for (int i = 0; i < keypoints.size(); i++) {
 			cv::Vec4i orientation;
@@ -262,18 +262,35 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 
 			centre.x = keypoints[i].x;
 			centre.y = keypoints[i].y;
+
+			// Apply crude outlier filter
+			if (centre.x < 3 || centre.x > depth_image.cols - 3
+					|| centre.y < 3 || centre.y > depth_image.rows - 3) continue;
+
 			orientation[0] = key_orientations[i].x;
 			orientation[1] = key_orientations[i].y;
 			orientation[2] = keypoints[i].x;
 			orientation[3] = keypoints[i].y;
 
-//			mark_body_part(segments, cv::Point(key_orientations[i].x, key_orientations[i].y), classifier::HEAD);
-//			mark_body_part(segments, centre, classifier::RIGHT_FOOT);
-
 			if (!kframe.extract_part(patch, centre, orientation, pose::kDescriptorSize)) {
 				//std::cerr << "Skipping" << std::endl;
 				continue;
 			}
+
+			//std::cerr << "Prediction: " << svm.predict(part) << std::endl;
+			//float confidence;
+			classifier::BodyPart body_part;
+
+			/************* SVM prediction *************/
+#ifdef BENCHMARK
+t.start();
+#endif
+			svm.predict_probability(patch, &body_part);
+#ifdef BENCHMARK
+t.stop();
+std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::endl;
+#endif
+			/******************************************/
 
 //			cv::Mat part_copy;
 //			patch.copyTo(part_copy);
@@ -281,23 +298,9 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 //			part_copy.convertTo(part_copy, CV_8U);
 //
 //			cv::imshow("Interest Point", part_copy);
-//			cv::imwrite("interest_point.png", part_copy);
+//			//cv::imwrite("interest_point.png", part_copy);
 //			cv::waitKey(0);
 
-			//std::cerr << "Prediction: " << svm.predict(part) << std::endl;
-			float confidence;
-			classifier::BodyPart body_part;
-
-			/************* SVM prediction *************/
-#ifdef BENCHMARK
-t.start();
-#endif
-			svm.predict_probability(patch, &body_part, &confidence);
-#ifdef BENCHMARK
-t.stop();
-std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::endl;
-#endif
-			/******************************************/
 //			std::cout << "CONF = " << confidence << std::endl;
 //			std::cout << "BP = " << body_part << std::endl;
 //			cv::imshow("Interest Point", part_copy);
@@ -306,6 +309,8 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 
 			//if (confidence > classifier::kConfidenceThreshold) {
 			mark_body_part(depth_image_display, centre, body_part);
+//			mark_body_part(depth_image_display, cv::Point(key_orientations[i].x, key_orientations[i].y), body_part);
+			//mark_body_part(segments, centre, classifier::RIGHT_FOOT);
 
 			switch(body_part) {
 			case classifier::HEAD:
@@ -336,8 +341,8 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 			case classifier::RIGHT_HAND:
 			{
 				if (centre_truth_left_hand.x > 0 && centre_truth_right_hand.x > 0) {
-					//mark_body_part(depth_image_display, centre_truth_left_hand, classifier::LEFT_FOOT);
-					//mark_body_part(depth_image_display, centre_truth_right_hand, classifier::LEFT_FOOT);
+//					mark_body_part(depth_image_display, centre_truth_left_hand, classifier::LEFT_FOOT);
+//					mark_body_part(depth_image_display, centre_truth_right_hand, classifier::LEFT_FOOT);
 					float dist = std::min(l2norm(centre, centre_truth_left_hand),
 											l2norm(centre, centre_truth_right_hand));
 					if (dist < distance_threshold) {
@@ -371,8 +376,8 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 			//}
 
 
-			/* TODO: Debug
-			cv::circle(depth_image,
+			// TODO: Debug
+			/*cv::circle(depth_image,
 						centre,
 					 1.0,
 					 cv::Scalar( 255, 255, 255 ),
@@ -399,8 +404,10 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 		if (centre_truth_left_hand.x > 0 && !left_hand_detected) hand_fn++;
 		if (centre_truth_right_hand.x > 0 && !right_hand_detected) hand_fn++;
 
+		// FIXME: consider removal
 		cv::imshow("Segments", segments);
 		cv::imshow("Body parts", depth_image_display);
+		cv::setMouseCallback( "Segments", onMouse, 0 );
 //		cv::imwrite("body_part.png", depth_image_display);
 //		cv::imwrite("segments.png", segments);
 //

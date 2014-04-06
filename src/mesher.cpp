@@ -11,6 +11,7 @@
 
 //#define BENCHMARK 1
 #define DEBUG 1
+#define CENTROIDS_UNIFORM 20
 
 #ifdef BENCHMARK
 #include "timer.h"
@@ -19,6 +20,7 @@ static timer::Timer t;
 
 namespace mesher {
 
+// FIXME: Consider removal
 inline bool consider_edge(float z1, float z2, float z_scale, Graph graph_) {
 	if (sqrt(1 + 1 + (z1-z2)*(z1-z2)*z_scale) < pose::kMeshDistanceThreshold) {
 
@@ -46,7 +48,8 @@ Mesh::Mesh(float radius, int K) :
 		edge_length_threshold_(radius),
 		num_interest_points_(K),
 		orientation_delta_(pose::kOrientationDelta),
-		cost_function_(NULL) {}
+		cost_function_(NULL),
+		num_of_cc_(0) {}
 
 Mesh::~Mesh() {}
 
@@ -64,11 +67,12 @@ void Mesh::compute(const cv::Mat depth_img, float z_scale, const cv::Mat opt_flo
 	for(int row = 0; row < rows; row += kSampleStep) {
 		const float* p = depth_img.ptr<float>(row);
 		for(int col = 0; col < cols; col += kSampleStep) {
-			if (*p == 0.0f) continue;	// skipping the pixels with no depth information
-
-			int index = row*cols + col;
-			add_point(col, row, *p*z_scale, index);
-			index_map_[index] = cloud_points_.size() - 1;
+			if (*p != 0.0f) {
+				// skipping the pixels with no depth information
+				int index = row*cols + col;
+				add_point(col, row, *p*z_scale, index);
+				index_map_[index] = cloud_points_.size() - 1;
+			}
 			p += kSampleStep;
 		}
 	}
@@ -112,9 +116,6 @@ t.start();
 							cols - 1,	// bottom left
 							cols + 1	// bottom right
 							};
-	// To remove
-	float min_val, max_val;
-
 
 	// Building the graph
 	for (std::vector<XYZPoint>::iterator it = cloud_points_.begin(); it != cloud_points_.end(); it++) {
@@ -136,9 +137,6 @@ t.start();
 			float l22_distance = l22(p, nb);
 			float flow_cost = std::abs(*p_flow - *nb_flow);
 			float cost = cost_function_(l22_distance, flow_cost);
-
-			min_val = std::min(l22_distance, min_val);
-			max_val = std::max(l22_distance, max_val);
 
 			if (cost < edge_length_threshold_) {
 				assert(index_map_[nb_idx] >= 0 && index_map_[p_idx] >= 0 && index_map_[p_idx] < cloud_points_.size());
@@ -165,8 +163,10 @@ t.start();
 	// computing centroids and consequently the interest points
 	interest_points_ = std::vector<int>();
 	interest_points_o_ = std::vector<int>();
-    std::vector<int> component(boost::num_vertices(graph_));
-    int num = boost::connected_components(graph_, &component[0]);
+
+#ifndef	CENTROIDS_UNIFORM
+    components_ = std::vector<int>(boost::num_vertices(graph_));
+    num_of_cc_ = boost::connected_components(graph_, &components_[0]);
 
     //while (component.size() != index_map_.size()) index_map_.pop_back();
 
@@ -176,10 +176,10 @@ t.start();
     init_point.z = 0.0f;
     init_point.count = 0;
     init_point.index = -1;
-	centroids_ = std::vector<XYZPoint>(num, init_point);
-    for (size_t i = 0; i < component.size(); ++i) {
+	centroids_ = std::vector<XYZPoint>(num_of_cc_, init_point);
+    for (size_t i = 0; i < components_.size(); ++i) {
 		XYZPoint cloud_point = cloud_points_[i];
-		XYZPoint* p = &centroids_[component[i]];
+		XYZPoint* p = &centroids_[components_[i]];
 		p->x += cloud_point.x;
 		p->y += cloud_point.y;
 		p->z += cloud_point.z;
@@ -195,20 +195,32 @@ t.start();
     }
 
 	// Finding the closest point in the mesh
-	std::vector<float> k_sqr_distances(num, infinity);
+	std::vector<float> k_sqr_distances(num_of_cc_, infinity);
 
-    for (size_t i = 0; i < component.size(); ++i) {
+    for (size_t i = 0; i < components_.size(); ++i) {
     	XYZPoint cloud_point = cloud_points_[i];
-		XYZPoint p = centroids_[component[i]];
+		XYZPoint p = centroids_[components_[i]];
 
 		float delta = (p.x - cloud_point.x)*(p.x - cloud_point.x)
 								+ (p.y - cloud_point.y)*(p.y - cloud_point.y)
 								+ (p.z - cloud_point.z)*(p.z - cloud_point.z);
-		if (delta < k_sqr_distances[component[i]]) {
-			k_sqr_distances[component[i]] = delta;
-			centroids_[component[i]].index = i;
+		if (delta < k_sqr_distances[components_[i]]) {
+			k_sqr_distances[components_[i]] = delta;
+			centroids_[components_[i]].index = i;
 		}
     }
+#else
+    srand (time(NULL));
+    int num_of_vertices = cloud_points_.size();
+    int size_of_clusters = static_cast<int>(round(boost::num_vertices(graph_)/static_cast<float>(CENTROIDS_UNIFORM)));
+    for (int i = 0; i < CENTROIDS_UNIFORM; i++) {
+    	int index = rand() % num_of_vertices;
+        XYZPoint p = cloud_points_[index];
+        p.count = size_of_clusters;
+        p.index = index;
+        centroids_.push_back(p);
+    }
+#endif
 
 #ifdef BENCHMARK
 t.stop();
@@ -246,7 +258,9 @@ t.start();
 				}
 			}
 
-			assert(component[max_weight_vertex] == component[it->index]);
+#ifndef	CENTROIDS_UNIFORM
+			assert(components_[max_weight_vertex] == components_[it->index]);
+#endif
 			// adding a zero-weight edge
 			boost::add_edge(it->index, max_weight_vertex, 0, graph_);
 			interest_points_.push_back(max_weight_vertex);
@@ -412,11 +426,13 @@ void Mesh::colour_mat(cv::Mat& image) {
 	assert(image.type() == CV_8UC3);
 
 	// The number of connected components
-    std::vector<int> component(boost::num_vertices(graph_));
-    int num = boost::connected_components(graph_, &component[0]);
+//    std::vector<int> component(boost::num_vertices(graph_));
+//    int num = boost::connected_components(graph_, &component[0]);
+//    std::cout << "Num of CC (colouring): " << num << std::endl;
+
     std::vector<cv::Scalar> colours;
     srand (time(NULL));
-    for (size_t i = 0; i < num; i++) {
+    for (size_t i = 0; i < num_of_cc_; i++) {
     	colours.push_back(cv::Scalar(rand() % 255, rand() % 255, rand() % 255));
     }
 
@@ -425,14 +441,14 @@ void Mesh::colour_mat(cv::Mat& image) {
 	    for(int col = 0; col < image.cols; col += kSampleStep) {
 	    	int idx = row*image.cols + col;
 
-	    	if (index_map_[idx] >= 0 && index_map_[idx] < component.size()) {
+	    	if (index_map_[idx] >= 0 && index_map_[idx] < components_.size()) {
 
-	    		if (centroids_[component[index_map_[idx]]].index == index_map_[idx]) {
+	    		if (centroids_[components_[index_map_[idx]]].index == index_map_[idx]) {
 					*p = (uchar)255; p++;
 					*p = (uchar)255; p++;
 					*p = (uchar)255; p++;
 	    		} else {
-					cv::Scalar colour = colours[component[index_map_[idx]]];
+					cv::Scalar colour = colours[components_[index_map_[idx]]];
 					*p = (uchar)colour[0]; p++;
 					*p = (uchar)colour[1]; p++;
 					*p = (uchar)colour[2]; p++;
@@ -448,7 +464,8 @@ void Mesh::colour_mat(cv::Mat& image) {
 	}
 }
 
-void Mesh::colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl) {
+// FIXME: consider removal
+/*void Mesh::colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl) {
 
 	// The number of connected components
     std::vector<int> component(boost::num_vertices(graph_));
@@ -503,7 +520,7 @@ void Mesh::colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl) {
 
 		cloud_pcl->push_back(new_point);
     }
-}
+}*/
 
 /*void Mesh::expand(const int index,
 					pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,

@@ -68,17 +68,17 @@ bool DataIOBackend::load_float_image(std::string filename, cv::Mat& output) {
 void DataIOBackend::extract_parts() {}
 
 void DataIOBackend::image_to_string(cv::Mat image, std::stringstream& line) {
-	assert(image.type() == CV_8UC1);
+	assert(image.type() == CV_32F);
 
 	int index = 1;
 	for(int row = 0; row < image.rows; ++row) {
-	    uchar* p = image.ptr(row);
+		float* p = image.ptr<float>(row);
 	    for(int col = 0; col < image.cols; ++col) {
 	    	//std::cout << index << ":" << static_cast<int>(*p);
 
 	    	//if (index == 82) std::cout << ". 140 Done! " << line.str() << std::endl;
 	    	std::stringstream data;
-	    	data << static_cast<int>(image.at<uchar>(row, col));
+	    	data << image.at<float>(row, col);
 	    	line << " " << index++ << ":" << data.str();
 	    	//std::cout << ". Done. " << std::endl;
 	    }
@@ -94,6 +94,7 @@ void DataIOBackend::extract_positive_part(cv::Mat& frame,
 	cv::Vec4i orientation;
 	cv::Point centre;
 	cv::Mat part;
+
 	int x1 = to_x(x1_);
 	int y1 = to_y(y1_);
 	int x2 = to_x(x2_);
@@ -102,17 +103,10 @@ void DataIOBackend::extract_positive_part(cv::Mat& frame,
 	centre.x = x2;
 	centre.y = y2;
 
-	if (id == 1) {	// HEAD
-		orientation[0] = x2;
-		orientation[1] = y2;
-		orientation[2] = x1;
-		orientation[3] = y1;
-	} else {
-		orientation[0] = x1;
-		orientation[1] = y1;
-		orientation[2] = x2;
-		orientation[3] = y2;
-	}
+	orientation[0] = x1;
+	orientation[1] = y1;
+	orientation[2] = x2;
+	orientation[3] = y2;
 
 	keyframe::Keyframe kframe(frame);
 	kframe.extract_part(part, centre, orientation, pose::kDescriptorSize);

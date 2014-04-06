@@ -80,14 +80,17 @@ namespace mesher {
 //		void set_pointcloud(std::vector<XYZPoint>& cloud, const int width, const int height);
 //		void set_zfilter(float lower, float upper);
 		void colour_mat(cv::Mat& image);
-		void colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl);
+
+
+//		void colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl);
 //		void compute();
 		void set_edge_threshold(float threshold) { edge_length_threshold_ = threshold; };
 		Graph get_graph() { return graph_; };
 		void get_interest_points(std::vector<cv::Point>& points,
 										std::vector<cv::Point>& orientations);
 
-		// DEBUG
+		// TODO: DEBUG
+		int get_cc_index(int index) { return components_[index_map_[index]]; };
 		void mark_centroids(cv::Mat& image, float colour);
 		void set_cost_function(float(*cost_function)(const float, const float)) { cost_function_ = cost_function; };
 
@@ -116,6 +119,8 @@ namespace mesher {
 		std::vector<int> index_map_;
 		std::vector<int> interest_points_;
 		std::vector<int> interest_points_o_;
+		std::vector<int> components_;
+		int num_of_cc_;
 
 		float (*cost_function_)(const float p1, const float p2);
 

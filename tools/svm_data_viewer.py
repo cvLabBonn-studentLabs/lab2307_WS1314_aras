@@ -13,6 +13,7 @@ def main(argv=None):
     
     filename = sys.argv[1]
     size_string = sys.argv[2]
+    norm_z = int(sys.argv[3])
     width, height = map(lambda x: int(x), size_string.split('x'))
     print "Width:Height: %d:%d" % (width, height)
     file = open(filename, 'r')
@@ -20,7 +21,7 @@ def main(argv=None):
     im = Image.new('L', (width, height))
     for line in file:
         
-        data = map(lambda x: int(x.split(":")[1]), line.split(" ")[2:])
+        data = map(lambda x: int(round(float(x.split(":")[1])*norm_z)), line.split(" ")[2:])
         print "Num Pixels: %d" % len(data)
         im.putdata(data)
         im.show()

@@ -92,8 +92,8 @@ namespace io {
 		}
 
 		// HEAD
-		centre_truth_head.x = ground_truth_[4];
-		centre_truth_head.y = ground_truth_[5];
+		centre_truth_head.x = ground_truth_[6];
+		centre_truth_head.y = ground_truth_[7];
 
 		// LEFT HAND
 		centre_truth_left_hand.x = ground_truth_[0];
@@ -156,27 +156,26 @@ namespace io {
 
 		int head_idx, hand_idx, leg_idx;
 		head_idx = hand_idx = leg_idx = 1;
-		cv::Mat depth_img, rgb_img, frame;
+		cv::Mat depth_img, rgb_img;
 		while (read_next_frame(rgb_img, depth_img)) {
-			std::vector<int> positive_centres;
 
-			cv::normalize(depth_img, frame, 0, 255, cv::NORM_MINMAX);
-			frame.convertTo(frame, CV_8UC1);
+			assert(depth_img.type() == CV_32F);
+			std::vector<int> positive_centres;
 
 			// Head
 			if (ground_truth_[6] > 0 && ground_truth_[4] > 0) {
-				extract_positive_part(frame, data,
-										ground_truth_[4], ground_truth_[5],
+				extract_positive_part(depth_img, data,
 										ground_truth_[6], ground_truth_[7],
+										ground_truth_[4], ground_truth_[5],
 										classifier::HEAD);
 
-				positive_centres.push_back(ground_truth_[4]);
-				positive_centres.push_back(ground_truth_[5]);
+				positive_centres.push_back(ground_truth_[6]);
+				positive_centres.push_back(ground_truth_[7]);
 			}
 
 			// Left hand
 			if (ground_truth_[0] > 0 && ground_truth_[2] > 0) {
-				extract_positive_part(frame, data,
+				extract_positive_part(depth_img, data,
 						ground_truth_[2], ground_truth_[3],
 						ground_truth_[0], ground_truth_[1],
 						classifier::LEFT_HAND);
@@ -187,7 +186,7 @@ namespace io {
 
 			// Right hand
 			if (ground_truth_[8] > 0 && ground_truth_[10] > 0) {
-				extract_positive_part(frame, data,
+				extract_positive_part(depth_img, data,
 						ground_truth_[10], ground_truth_[11],
 						ground_truth_[8], ground_truth_[9],
 						classifier::RIGHT_HAND);
@@ -198,7 +197,7 @@ namespace io {
 
 			// Left leg
 			if (ground_truth_[12] > 0 && ground_truth_[14] > 0) {
-				extract_positive_part(frame, data,
+				extract_positive_part(depth_img, data,
 						ground_truth_[14], ground_truth_[15],
 						ground_truth_[12], ground_truth_[13],
 						classifier::LEFT_FOOT);
@@ -209,7 +208,7 @@ namespace io {
 
 			// Right leg
 			if (ground_truth_[16] > 0 && ground_truth_[17] > 0) {
-				extract_positive_part(frame, data,
+				extract_positive_part(depth_img, data,
 						ground_truth_[18], ground_truth_[19],
 						ground_truth_[16], ground_truth_[17],
 						classifier::RIGHT_FOOT);
@@ -219,7 +218,7 @@ namespace io {
 			}
 
 			for (int j = 0; j < 5; j++) {
-				extract_negative_part(frame, data, positive_centres);
+				extract_negative_part(depth_img, data, positive_centres);
 			}
 		}
 	}

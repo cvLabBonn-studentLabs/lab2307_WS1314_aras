@@ -12,7 +12,7 @@ namespace classifier {
 
 ClassifierSVM::ClassifierSVM(int num_attr) {
 
-	features_ = (struct svm_node *) malloc(num_attr * sizeof(struct svm_node));
+	features_ = (struct svm_node *) malloc((num_attr + 1) * sizeof(struct svm_node));
 
 }
 
@@ -53,10 +53,10 @@ void ClassifierSVM::create_feature_vector(const cv::Mat image) {
 	features_[index].index = -1;
 }
 
-void ClassifierSVM::predict_probability(const cv::Mat image, BodyPart* body_part, float* confidence) {
+void ClassifierSVM::predict_probability(const cv::Mat image, BodyPart* body_part) {
 	create_feature_vector(image);
 
-	static int labels[] = {2,3,0,1};
+	static int labels[] = {1,2,3,4,5,0};
 
 	double *prob_estimates = (double *) malloc(model_->nr_class*sizeof(double));
 	double predict_label;
@@ -65,7 +65,9 @@ void ClassifierSVM::predict_probability(const cv::Mat image, BodyPart* body_part
 	float max_probabilty = -1.f;
 	int label = 0;
 
+//	std::cerr << "Prediction: " << predict_label << std::endl;
 	for(int j = 0; j< model_->nr_class; j++) {
+//		std::cerr << "class " << j << ": " << prob_estimates[j] << std::endl;
 		if (labels[j] == 0) continue;
 
 		if (prob_estimates[j] > kConfidenceThreshold
@@ -76,7 +78,8 @@ void ClassifierSVM::predict_probability(const cv::Mat image, BodyPart* body_part
 	}
 
 	*body_part = static_cast<BodyPart>(label);
-	*confidence = (label != 0) ? max_probabilty : prob_estimates[0];
+	//std::cerr << std::endl;
+//	*confidence = (label != 0) ? max_probabilty : prob_estimates[0];
 }
 
 

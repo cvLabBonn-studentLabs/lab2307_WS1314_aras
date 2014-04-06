@@ -9,17 +9,17 @@
 #define CONSTANTS_H_
 
 namespace opflow {
-	const bool ON = true;
+	const bool ON = false;
 }
 
 namespace classifier {
-	const float kConfidenceThreshold = 0.85f;
+	const float kConfidenceThreshold = 0.5f;
 }
 
 namespace io {
 	enum Dataset { ETHZ, CornellCAD120, StanfordEval, Bonn };
 
-	const Dataset kCurrentDataset = StanfordEval;
+	const Dataset kCurrentDataset = Bonn;
 
 	const int kInputWidth = 144;
 	const int kInputHeight = 176;
@@ -31,9 +31,8 @@ namespace io {
 namespace pose {
 
 	const float kOpticalFlowThreshold = 90;//0.025f;
-	const float kDownsampleCellSize = 3.3f;
 	const float kMeshDistanceThreshold = 3.0f;
-	const float kOrientationDelta = 20;
+	const float kOrientationDelta = 8;
 
 	const int kDescriptorSize = 41;
 	const int kNumInterestPoints = 40;

@@ -23,7 +23,7 @@ public:
 	~ClassifierSVM();
 	bool read_model(const std::string file);
 	int predict(const cv::Mat image);
-	void predict_probability(const cv::Mat image, BodyPart *body_part, float *confidence);
+	void predict_probability(const cv::Mat image, BodyPart *body_part);
 private:
 	void create_feature_vector(const cv::Mat image);
 	struct svm_model* model_;

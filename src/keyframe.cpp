@@ -23,7 +23,7 @@ bool Keyframe::extract_part(cv::Mat& dst,
 		align_x = window_size;
 		align_y = window_size;
 
-		frame = cv::Mat(cv::Size(frame.cols + 2*align_x, frame.rows + 2*align_y), CV_8UC1, cv::Scalar(128));
+		frame = cv::Mat(cv::Size(frame.cols + 2*align_x, frame.rows + 2*align_y), CV_32F, 0.05);
 		cv::Mat roi = frame(cv::Rect(align_x, align_y, keyframe_.cols, keyframe_.rows));
 		keyframe_.copyTo(roi);
 	}
