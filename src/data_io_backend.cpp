@@ -122,8 +122,6 @@ void DataIOBackend::extract_positive_part(cv::Mat& frame,
 		return;
 	}
 
-	std::cout << "Extracted " << centre.x << " " << centre.y << std::endl;
-
 //	cv::imshow("Part", part);
 //	cv::waitKey(0);
 
@@ -148,11 +146,16 @@ void DataIOBackend::extract_negative_part(cv::Mat& frame,
 					it != positives.end(); ) {
 			int pos_x = *it++;
 			int pos_y = *it++;
-			if ((std::abs(topleft.x - pos_x) < pose::kDescriptorSize)
-					|| (std::abs(topleft.y - pos_y) < pose::kDescriptorSize)) {
+
+			if (DataIOBackend::intersection_ratio(topleft, cv::Point(pos_x, pos_y)) > 0.5f) {
 				in_collision = true;
 				break;
 			}
+
+//			if ((std::abs(topleft.x - pos_x) < pose::kDescriptorSize)
+//					|| (std::abs(topleft.y - pos_y) < pose::kDescriptorSize)) {
+//
+//			}
 		}
 
 		if (in_collision) continue;

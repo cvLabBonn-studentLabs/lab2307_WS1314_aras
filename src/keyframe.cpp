@@ -26,8 +26,6 @@ bool Keyframe::extract_part(cv::Mat& dst,
 		frame = cv::Mat(cv::Size(frame.cols + 2*align_x, frame.rows + 2*align_y), CV_8UC1, cv::Scalar(128));
 		cv::Mat roi = frame(cv::Rect(align_x, align_y, keyframe_.cols, keyframe_.rows));
 		keyframe_.copyTo(roi);
-
-		std::cout << "Aligned" << std::endl;
 	}
 
 	// Rotating the ROI so that the direction points downwards

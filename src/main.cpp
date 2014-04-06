@@ -113,7 +113,7 @@ int main(int argc, char * argv[]) {
 
 	io::DataIO data(io::kCurrentDataset);
 	classifier::ClassifierSVM svm(num_attr);
-	svm.read_model("/media/neek/DATA/MAINF2307/data/Stanford_training/head_hands/data.scale.model");
+	svm.read_model("/media/DATA/MAINF2307/data/Stanford_training/head_hands/data.scale.model");
 	//svm.read_model("/home/neek/coding/mainf2307/data/bonn/training.scale.model");
 
 	opflow::OFTensor<float> aImage1, aImage2;
@@ -223,7 +223,7 @@ std::cout << "(BENCHMARKING) Optical Flow: " << t.duration() << "ms" << std::end
 t.start();
 #endif
 		mesher::Mesh mesh(pose::kMeshDistanceThreshold, K);
-		mesh.compute_with_flow(depth_image, image_of, 200.0);
+		mesh.compute(depth_image, data.getScaleZ(), image_of);
 		//mesh.set_pointcloud(result);
 		//mesh.set_zfilter(40.f, 60.f);
 		//mesh.compute();
@@ -237,16 +237,9 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 		cv::Mat segments;
 		depth_image_display.convertTo(segments, CV_8UC3);
 		mesh.colour_mat(segments);
-//		pcl::PointCloud<pcl::PointXYZRGB>::Ptr colour_pcl(new pcl::PointCloud<pcl::PointXYZRGB>());
-//		mesh.colour_cloud(colour_pcl);
-//
-//		std::cout << "Mesh size: " << mesh.size() << std::endl;
-//		std::cout << "Size of the new cloud: " << colour_pcl->size() << std::endl;
 
-		// To remove
-		//pcl::visualization::CloudViewer viewer("Simple Cloud Viewer");
-		//viewer.showCloud(colour_pcl, "God knows what");
-		//while (!viewer.wasStopped()) {}
+		std::cout << "Mesh size: " << mesh.size() << std::endl;
+//		std::cout << "Size of the new cloud: " << colour_pcl->size() << std::endl;
 
 		std::vector<cv::Point> keypoints, key_orientations;
 		mesh.get_interest_points(keypoints, key_orientations);
@@ -254,7 +247,7 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 		// for prediction step
 		depth_image.convertTo(depth_image, CV_32F);
 		cv::normalize(depth_image, depth_image, -1.0, 1.0, cv::NORM_MINMAX);
-		//mesh.mark_centroids(depth_image_display, 1.0);
+//		mesh.mark_centroids(depth_image_display, 1.0);
 //
 		keyframe::Keyframe kframe(depth_image);
 //		cv::imshow("Depth image", depth_image);
@@ -312,7 +305,7 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 
 
 			//if (confidence > classifier::kConfidenceThreshold) {
-				//mark_body_part(depth_image_display, centre, body_part);
+			mark_body_part(depth_image_display, centre, body_part);
 
 			switch(body_part) {
 			case classifier::HEAD:
@@ -406,15 +399,15 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 		if (centre_truth_left_hand.x > 0 && !left_hand_detected) hand_fn++;
 		if (centre_truth_right_hand.x > 0 && !right_hand_detected) hand_fn++;
 
-//		cv::imshow("Segments", segments);
-//		cv::imshow("Body parts", depth_image_display);
+		cv::imshow("Segments", segments);
+		cv::imshow("Body parts", depth_image_display);
 //		cv::imwrite("body_part.png", depth_image_display);
 //		cv::imwrite("segments.png", segments);
 //
 //		cv::normalize(image_of, image_of, 0, 128, cv::NORM_MINMAX);
 //		image_of.convertTo(image_of, CV_8UC1);
 //		cv::imwrite("of.png", image_of);
-//		cv::waitKey(0);
+		cv::waitKey(0);
 
 		//cloud = boost::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
 

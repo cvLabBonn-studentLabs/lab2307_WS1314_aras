@@ -28,6 +28,8 @@ public:
 											cv::Point& centre_left_foot,
 											cv::Point& centre_right_foot);
 	void extract_parts();
+
+	float getScaleZ() { return 200.f; };
 private:
 	int to_x(float x_);
 	int to_y(float y_);

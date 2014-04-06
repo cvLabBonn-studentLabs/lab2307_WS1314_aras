@@ -22,8 +22,8 @@
 #include <boost/property_map/property_map.hpp>
 
 //REMOVE
-#include <pcl/visualization/cloud_viewer.h>
-#include <pcl/filters/passthrough.h>
+//#include <pcl/visualization/cloud_viewer.h>
+//#include <pcl/filters/passthrough.h>
 //#include <pcl/filters/filter.h>
 
 #include "constants.h"
@@ -72,38 +72,52 @@ namespace mesher {
 	public:
 		Mesh(float radius, int K);
 		~Mesh();
-		void compute_with_flow(const cv::Mat depth_img, const cv::Mat opt_flow, float z_scale);
-		void set_pointcloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) { cloud_ = cloud; }
-		void set_zfilter(float lower, float upper);
+
+//		void compute();
+		void compute(const cv::Mat depth_img, float z_scale);
+		void compute(const cv::Mat depth_img, float z_scale, const cv::Mat opt_flow);
+//		void set_pointcloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) { cloud_ = cloud; }
+//		void set_pointcloud(std::vector<XYZPoint>& cloud, const int width, const int height);
+//		void set_zfilter(float lower, float upper);
 		void colour_mat(cv::Mat& image);
 		void colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl);
-		void compute();
-		void set_edge_threshold(float threshold) { edge_lenth_threshold_ = threshold; };
+//		void compute();
+		void set_edge_threshold(float threshold) { edge_length_threshold_ = threshold; };
 		Graph get_graph() { return graph_; };
 		void get_interest_points(std::vector<cv::Point>& points,
 										std::vector<cv::Point>& orientations);
 
 		// DEBUG
 		void mark_centroids(cv::Mat& image, float colour);
+		void set_cost_function(float(*cost_function)(const float, const float)) { cost_function_ = cost_function; };
 
 		int size() { return boost::num_vertices(graph_); };
 	private:
-		void expand(const int index,
-					pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
-					pcl::KdTreeFLANN<pcl::PointXYZ> *kdtree,
-					bool* expanded);
+//		void expand(const int index,
+//					pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
+//					pcl::KdTreeFLANN<pcl::PointXYZ> *kdtree,
+//					bool* expanded);
 
-		void add_point(float x, float y, float z);
+		void add_point(float x, float y, float z, int index);
+		void compute_(const cv::Mat opt_flow);
+		void build_mesh_();
+		static float default_cost_function(float edge_weight, float flow_cost) { return edge_weight + flow_cost*pose::kOpticalFlowThreshold; };
+		float l22(XYZPoint& p1, XYZPoint& p2) {
+			float norm = static_cast<float>(kSampleStep)*static_cast<float>(kSampleStep);
+			return ((p1.x - p2.x)*(p1.x - p2.x) + (p1.y - p2.y)*(p1.y - p2.y) + (p1.z - p2.z)*(p1.z - p2.z))/norm; };
 
 		int num_interest_points_;
 		int orientation_delta_;
-		float edge_lenth_threshold_;
+		float edge_length_threshold_;
 		Graph graph_;
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
+//		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
+		std::vector<XYZPoint> cloud_points_;
 		std::vector<XYZPoint> centroids_;
 		std::vector<int> index_map_;
 		std::vector<int> interest_points_;
 		std::vector<int> interest_points_o_;
+
+		float (*cost_function_)(const float p1, const float p2);
 
 		static const int kCenterMassNumNeighbours = 5;
 		static const int kMinMeshSize = 5;

@@ -50,8 +50,8 @@ TEST(MeshTest, CreatesCorrectMesh)
 	}
 
 	Mesh m(1.42f, 10);
-	m.set_pointcloud(cloud);
-	m.compute();
+//	m.set_pointcloud(cloud);
+//	m.compute();
 
 	// The number of connected components
     std::vector<int> component(m.size());

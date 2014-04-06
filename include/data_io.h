@@ -35,6 +35,8 @@ public:
 									cv::Point& centre_right_foot);
 
 	void extract_data();
+
+	float getScaleZ();
 private:
 
 	void png_to_pointcloud(const cv::Mat& rgb_img,

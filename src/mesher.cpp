@@ -43,56 +43,61 @@ float get_random_colour() {
 
 
 Mesh::Mesh(float radius, int K) :
-		edge_lenth_threshold_(radius),
+		edge_length_threshold_(radius),
 		num_interest_points_(K),
-		orientation_delta_(pose::kOrientationDelta) {}
+		orientation_delta_(pose::kOrientationDelta),
+		cost_function_(NULL) {}
+
 Mesh::~Mesh() {}
 
-void Mesh::set_zfilter(float lower, float upper) {
-    // Create the filtering object
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud (cloud_);
-    pass.setFilterFieldName ("z");
-    pass.setFilterLimits (lower, upper);
-    pass.filter (*cloud_);
+void Mesh::compute(const cv::Mat depth_img, float z_scale, const cv::Mat opt_flow) {
+	// creating the point cloud
+	const int cols = depth_img.cols;
+	const int rows = depth_img.rows;
+	const int image_size = cols*rows;
+
+	#ifdef BENCHMARK
+	t.start();
+	#endif
+
+	index_map_ = std::vector<int>(image_size, -1);
+	for(int row = 0; row < rows; row += kSampleStep) {
+		const float* p = depth_img.ptr<float>(row);
+		for(int col = 0; col < cols; col += kSampleStep) {
+			if (*p == 0.0f) continue;	// skipping the pixels with no depth information
+
+			int index = row*cols + col;
+			add_point(col, row, *p*z_scale, index);
+			index_map_[index] = cloud_points_.size() - 1;
+			p += kSampleStep;
+		}
+	}
+
+	#ifdef BENCHMARK
+	t.stop();
+	std::cout << "(BENCHMARKING) INDEX_MAP + CLOUD (" << cloud_points_.size() << " vertices): " << t.duration() << "ms" << std::endl;
+	#endif
+
+	compute_(opt_flow);
+}
+
+void Mesh::compute(const cv::Mat depth_img, float z_scale) {
+	cv::Mat image_of(depth_img.size(), CV_32F, 0.f);
+	compute(depth_img, z_scale, image_of);
 }
 
 
-void Mesh::compute_with_flow(const cv::Mat depth_img, const cv::Mat opt_flow, float z_scale) {
-	assert(depth_img.type() == CV_32F && opt_flow.type() == CV_32F);
-
-	cloud_ = boost::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
-	int point_idx = 0;
-	const int cols = depth_img.cols;
-	const int rows = depth_img.rows;
-	int image_size = cols*rows;
-
-#ifdef BENCHMARK
-t.start();
-#endif
-
-	index_map_ = std::vector<int>(image_size, -1);
-	std::vector<int> vertices;
-	for(int row = 0; row < rows; row += kSampleStep) {
-	    const float* p = depth_img.ptr<float>(row);
-	    for(int col = 0; col < cols; col += kSampleStep) {
-
-	    	// adding only non-background points
-	    	//if (*p > kSubtractBackgroundZ) {
-				add_point(col, row, *p*z_scale);
-				index_map_[row*cols + col] = point_idx++;
-				vertices.push_back(row*cols + col);
-			//}
-
-	    	p++;
-	    }
+void Mesh::compute_(const cv::Mat opt_flow) {
+	if (cost_function_ == NULL) {
+		cost_function_ = &(Mesh::default_cost_function);
 	}
 
+	// creating the point cloud
+	const int cols = opt_flow.cols;
+	const int rows = opt_flow.rows;
+	const int img_size = cols*rows;
 
-#ifdef BENCHMARK
-t.stop();
-std::cout << "(BENCHMARKING) INDEX_MAP + CLOUD (" << vertices.size() << " vertices): " << t.duration() << "ms" << std::endl;
-#endif
+	assert(opt_flow.type() == CV_32F);
 
 #ifdef BENCHMARK
 t.start();
@@ -107,45 +112,45 @@ t.start();
 							cols - 1,	// bottom left
 							cols + 1	// bottom right
 							};
+	// To remove
+	float min_val, max_val;
+
 
 	// Building the graph
-	for (std::vector<int>::iterator it = vertices.begin();
-			it != vertices.end(); it++) {
+	for (std::vector<XYZPoint>::iterator it = cloud_points_.begin(); it != cloud_points_.end(); it++) {
 
-		int row = *it / cols;
-		int col = *it % cols;
+		int row = it->index / cols;
+		int col = it->index % cols;
 
-		const float* p = depth_img.ptr<float>(row) + col;
+		XYZPoint p = *it;
 		const float* p_flow = opt_flow.ptr<float>(row) + col;
 
 		// Searching the neighbourhood
-		int p_idx = *it;
+		int p_idx = it->index;
 		for (int k = 0; k < 8; k++) {
 			int nb_idx = p_idx + kSampleStep*indices[k];
-			if (nb_idx < 0 || index_map_[nb_idx] == -1) continue;
+			if (nb_idx < 0 || nb_idx >= img_size || index_map_[nb_idx] == -1) continue; // skipping the neighbours that are out of scope or have no depth information
 
-			const float* nb = p + kSampleStep*indices[k];
+			XYZPoint nb = cloud_points_[index_map_[nb_idx]];
 			const float* nb_flow = p_flow + kSampleStep*indices[k];
-			float edge_weight = std::sqrt(kSampleStep*2.f + (*p - *nb)*(*p - *nb)*z_scale*z_scale);
+			float l22_distance = l22(p, nb);
 			float flow_cost = std::abs(*p_flow - *nb_flow);
-			float cost = edge_weight + flow_cost*pose::kOpticalFlowThreshold;
+			float cost = cost_function_(l22_distance, flow_cost);
 
-			if (cost < edge_lenth_threshold_) {
-				assert(edge_weight > 0 && edge_weight < 10);
-				assert(index_map_[p_idx] >= 0 && index_map_[p_idx] < vertices.size());
+			min_val = std::min(l22_distance, min_val);
+			max_val = std::max(l22_distance, max_val);
 
-				if (index_map_[nb_idx] >= 0 && index_map_[nb_idx] < vertices.size()) {
-					//assert(index_map_[nb_idx] >= 0 && index_map_[nb_idx] < vertices.size());
-
-					boost::add_edge(index_map_[p_idx], index_map_[nb_idx], edge_weight, graph_);
-				}
+			if (cost < edge_length_threshold_) {
+				assert(index_map_[nb_idx] >= 0 && index_map_[p_idx] >= 0 && index_map_[p_idx] < cloud_points_.size());
+				boost::add_edge(index_map_[p_idx], index_map_[nb_idx], l22_distance, graph_);
 			}
 		}
-
 	}
 
+	build_mesh_();
+}
 
-
+void Mesh::build_mesh_() {
 
 
 #ifdef BENCHMARK
@@ -171,14 +176,13 @@ t.start();
     init_point.z = 0.0f;
     init_point.count = 0;
     init_point.index = -1;
-	//std::vector<XYZPoint> centroids(num, init_point);
 	centroids_ = std::vector<XYZPoint>(num, init_point);
     for (size_t i = 0; i < component.size(); ++i) {
-		pcl::PointXYZ point_pcl = cloud_->at(i);
+		XYZPoint cloud_point = cloud_points_[i];
 		XYZPoint* p = &centroids_[component[i]];
-		p->x += point_pcl.x;
-		p->y += point_pcl.y;
-		p->z += point_pcl.z;
+		p->x += cloud_point.x;
+		p->y += cloud_point.y;
+		p->z += cloud_point.z;
 		p->count++;
     }
 
@@ -194,12 +198,12 @@ t.start();
 	std::vector<float> k_sqr_distances(num, infinity);
 
     for (size_t i = 0; i < component.size(); ++i) {
-		pcl::PointXYZ point_pcl = cloud_->at(i);
+    	XYZPoint cloud_point = cloud_points_[i];
 		XYZPoint p = centroids_[component[i]];
 
-		float delta = (p.x - point_pcl.x)*(p.x - point_pcl.x)
-								+ (p.y - point_pcl.y)*(p.y - point_pcl.y)
-								+ (p.z - point_pcl.z)*(p.z - point_pcl.z)*z_scale*z_scale;
+		float delta = (p.x - cloud_point.x)*(p.x - cloud_point.x)
+								+ (p.y - cloud_point.y)*(p.y - cloud_point.y)
+								+ (p.z - cloud_point.z)*(p.z - cloud_point.z);
 		if (delta < k_sqr_distances[component[i]]) {
 			k_sqr_distances[component[i]] = delta;
 			centroids_[component[i]].index = i;
@@ -233,10 +237,9 @@ t.start();
 
 			boost::graph_traits <Graph>::vertex_iterator vi, vend;
 			int max_weight = -1;
-			int max_weight_vertex = -1;;
+			int max_weight_vertex = -1;
 
 			for (boost::tie(vi, vend) = boost::vertices(graph_); vi != vend; ++vi) {
-				//std::cout << cloud_->at(*vi).x << " " << cloud_->at(*vi).y << " " << d[*vi] << std::endl;
 				if (max_weight < d[*vi] && d[*vi] != infinity) {
 					max_weight = d[*vi];
 					max_weight_vertex = *vi;
@@ -264,6 +267,7 @@ std::cout << "(BENCHMARKING) Finding IP: " << t.duration() << "ms" << std::endl;
 #endif
 }
 
+/*
 void Mesh::compute() {
 
 #ifdef BENCHMARK
@@ -402,7 +406,7 @@ t.start();
 t.stop();
 std::cout << "(BENCHMARKING) Finding IP: " << t.duration() << "ms" << std::endl;
 #endif
-}
+}*/
 
 void Mesh::colour_mat(cv::Mat& image) {
 	assert(image.type() == CV_8UC3);
@@ -421,14 +425,14 @@ void Mesh::colour_mat(cv::Mat& image) {
 	    for(int col = 0; col < image.cols; col += kSampleStep) {
 	    	int idx = row*image.cols + col;
 
-	    	if (index_map_[idx] >= 0 && index_map_[row*image.cols + col] < component.size()) {
+	    	if (index_map_[idx] >= 0 && index_map_[idx] < component.size()) {
 
-	    		if (centroids_[component[index_map_[row*image.cols + col]]].index == index_map_[row*image.cols + col]) {
+	    		if (centroids_[component[index_map_[idx]]].index == index_map_[idx]) {
 					*p = (uchar)255; p++;
 					*p = (uchar)255; p++;
 					*p = (uchar)255; p++;
 	    		} else {
-					cv::Scalar colour = colours[component[index_map_[row*image.cols + col]]];
+					cv::Scalar colour = colours[component[index_map_[idx]]];
 					*p = (uchar)colour[0]; p++;
 					*p = (uchar)colour[1]; p++;
 					*p = (uchar)colour[2]; p++;
@@ -437,7 +441,6 @@ void Mesh::colour_mat(cv::Mat& image) {
 				*p = (uchar)128; p++;
 				*p = (uchar)128; p++;
 				*p = (uchar)128; p++;
-	    		//std::cerr << "Skipping for " << row << " " << col << std::endl;
 	    	}
 
 	    	p += 3*(kSampleStep - 1);
@@ -461,9 +464,9 @@ void Mesh::colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl) {
     color_global.Green = 255;
     for (size_t i = 0; i < component.size(); ++i) {
 		pcl::PointXYZRGB new_point;
-		new_point.x = cloud_->at(i).x;
-		new_point.y = cloud_->at(i).y;
-		new_point.z = cloud_->at(i).z;
+		new_point.x = cloud_points_[i].x;
+		new_point.y = cloud_points_[i].y;
+		new_point.z = cloud_points_[i].z;
 		new_point.rgb = colours[component[i]];
 
 		if (centroids_[component[i]].index == i) {
@@ -479,9 +482,9 @@ void Mesh::colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl) {
     for (size_t i = 0; i < interest_points_.size(); ++i) {
     	int point_idx = interest_points_[i];
     	pcl::PointXYZRGB new_point;
-		new_point.x = cloud_->at(point_idx).x;
-		new_point.y = cloud_->at(point_idx).y;
-		new_point.z = cloud_->at(point_idx).z;
+		new_point.x = cloud_points_[point_idx].x;
+		new_point.y = cloud_points_[point_idx].y;
+		new_point.z = cloud_points_[point_idx].z;
 		new_point.rgb = color_global.float_value;
 
 		cloud_pcl->push_back(new_point);
@@ -493,16 +496,16 @@ void Mesh::colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl) {
     for (size_t i = 0; i < interest_points_.size(); ++i) {
     	int point_idx = interest_points_o_[i];
     	pcl::PointXYZRGB new_point;
-		new_point.x = cloud_->at(point_idx).x;
-		new_point.y = cloud_->at(point_idx).y;
-		new_point.z = cloud_->at(point_idx).z;
+		new_point.x = cloud_points_[point_idx].x;
+		new_point.y = cloud_points_[point_idx].y;
+		new_point.z = cloud_points_[point_idx].z;
 		new_point.rgb = color_global.float_value;
 
 		cloud_pcl->push_back(new_point);
     }
 }
 
-void Mesh::expand(const int index,
+/*void Mesh::expand(const int index,
 					pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
 					pcl::KdTreeFLANN<pcl::PointXYZ> *kdtree,
 					bool* expanded) {
@@ -520,7 +523,7 @@ void Mesh::expand(const int index,
 
 		// expanding the vertex
 		int num_neighbours =  kdtree->radiusSearch(cloud_in->at(idx),
-												edge_lenth_threshold_,
+												edge_length_threshold_,
 												point_idx,
 												square_distance);
 
@@ -539,22 +542,23 @@ void Mesh::expand(const int index,
 
 		expanded[idx] = true;
 	}
-}
+}*/
 
-void Mesh::add_point(float x, float y, float z) {
-	pcl::PointXYZ new_point;
+void Mesh::add_point(float x, float y, float z, int index) {
+	XYZPoint new_point;
 	new_point.x = x;
 	new_point.y = y;
 	new_point.z = z;
-	cloud_->push_back(new_point);
+	new_point.index = index;
+	cloud_points_.push_back(new_point);
 }
 
 void Mesh::mark_centroids(cv::Mat& image, float colour) {
 	for (std::vector<XYZPoint>::iterator it = centroids_.begin(); it != centroids_.end(); ++it) {
 		if (it->count < kMinMeshSize) continue;
 
-		int x = cloud_->points[it->index].x;
-		int y = cloud_->points[it->index].y;
+		int x = cloud_points_[it->index].x;
+		int y = cloud_points_[it->index].y;
 
 
 		cv::circle(image, cv::Point(x, y), 3.0, cv::Scalar(255, 255, 255), -1, 8);
@@ -567,8 +571,8 @@ void Mesh::get_interest_points(std::vector<cv::Point>& points, std::vector<cv::P
 
 	for (int i = 0; i < interest_points_.size(); i++) {
 		cv::Point p;
-		p.x = cloud_->points[interest_points_[i]].x;
-		p.y = cloud_->points[interest_points_[i]].y;
+		p.x = cloud_points_[interest_points_[i]].x;
+		p.y = cloud_points_[interest_points_[i]].y;
 		points.push_back(p);
 
 //		std::cerr << "IP: [" << i << "] X: " << p.x <<
@@ -576,8 +580,8 @@ void Mesh::get_interest_points(std::vector<cv::Point>& points, std::vector<cv::P
 //					" Z: " << cloud_->points[interest_points_[i]].z << std::endl;
 
 		cv::Point o;
-		o.x = cloud_->points[interest_points_o_[i]].x;
-		o.y = cloud_->points[interest_points_o_[i]].y;
+		o.x = cloud_points_[interest_points_o_[i]].x;
+		o.y = cloud_points_[interest_points_o_[i]].y;
 		orientations.push_back(o);
 	}
 }

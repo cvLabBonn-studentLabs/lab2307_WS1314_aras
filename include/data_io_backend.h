@@ -29,6 +29,21 @@ public:
 									cv::Point& centre_right_hand,
 									cv::Point& centre_left_foot,
 									cv::Point& centre_right_foot);
+	virtual float getScaleZ() { return 1.f; };
+
+public:
+	static float intersection_ratio(cv::Point topleft1, cv::Point topleft2) {
+		float isc_x = std::max(std::min(topleft1.x + pose::kDescriptorSize,
+										topleft2.x + pose::kDescriptorSize)
+								- std::max(topleft1.x, topleft2.x), 0);
+
+		float isc_y = std::max(std::min(std::min(topleft1.y + pose::kDescriptorSize, io::kInputWidth - 1),
+								std::min(topleft2.y + pose::kDescriptorSize, io::kInputWidth - 1))
+						- std::max(topleft1.y, topleft2.y), 0);
+
+		return isc_x*isc_y/static_cast<float>(pose::kDescriptorSize*pose::kDescriptorSize);
+	}
+
 protected:
 	bool load_float_image(std::string filename, cv::Mat& output);
 	void image_to_string(cv::Mat image, std::stringstream& line);

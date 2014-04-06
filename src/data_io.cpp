@@ -48,6 +48,10 @@ namespace io {
 
 	DataIO::~DataIO() {}
 
+	float DataIO::getScaleZ() {
+		return backend_->getScaleZ();
+	}
+
 	void DataIO::read(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
 						pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_rgb) {
 

@@ -142,12 +142,12 @@ namespace io {
 		srand (time(NULL));
 
 		// Creating directory structure
-		const std::string kTrainingDataPathHead = kPath + "training/";
+		const std::string kTrainingDataPathHead = kPath + "/training";
 
 		boost::filesystem::path training_data_path_head(kTrainingDataPathHead);
 		boost::filesystem::create_directory(training_data_path_head);
 
-		std::ofstream data((kTrainingDataPathHead + "data.txt").c_str());
+		std::ofstream data((kTrainingDataPathHead + "/data.txt").c_str());
 
 
 		if (!data.is_open()) {
@@ -218,7 +218,9 @@ namespace io {
 				positive_centres.push_back(ground_truth_[17]);
 			}
 
-			extract_negative_part(frame, data, positive_centres);
+			for (int j = 0; j < 5; j++) {
+				extract_negative_part(frame, data, positive_centres);
+			}
 		}
 	}
 

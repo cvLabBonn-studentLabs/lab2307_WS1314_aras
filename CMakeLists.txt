@@ -90,7 +90,7 @@ include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 # Unit Tests
 ################################
 # Add test cpp file
-add_executable( runUnitTests tests/mesh_tests.cpp )
+add_executable( runUnitTests tests/mesh_tests.cpp tests/dataset_tests.cpp )
 # Link test executable against gtest & gtest_main
 target_link_libraries(runUnitTests mesh gtest gtest_main )
 add_test( runUnitTests runUnitTests )
