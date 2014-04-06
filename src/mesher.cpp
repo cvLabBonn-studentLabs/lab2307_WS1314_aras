@@ -9,7 +9,7 @@
 #include "mesher.h"
 
 
-#define BENCHMARK 1
+//#define BENCHMARK 1
 #define DEBUG 1
 
 #ifdef BENCHMARK
@@ -72,71 +72,81 @@ t.start();
 #endif
 
 	index_map_ = std::vector<int>(image_size, -1);
-	for(int row = 0; row < rows; ++row) {
+	std::vector<int> vertices;
+	for(int row = 0; row < rows; row += kSampleStep) {
 	    const float* p = depth_img.ptr<float>(row);
-	    for(int col = 0; col < cols; ++col) {
+	    for(int col = 0; col < cols; col += kSampleStep) {
 
 	    	// adding only non-background points
-	    	if (*p > kSubtractBackgroundZ) {
+	    	//if (*p > kSubtractBackgroundZ) {
 				add_point(col, row, *p*z_scale);
 				index_map_[row*cols + col] = point_idx++;
-			}
+				vertices.push_back(row*cols + col);
+			//}
 
 	    	p++;
 	    }
 	}
 
+
 #ifdef BENCHMARK
 t.stop();
-std::cout << "(BENCHMARKING) INDEX_MAP + CLOUD: " << t.duration() << "ms" << std::endl;
+std::cout << "(BENCHMARKING) INDEX_MAP + CLOUD (" << vertices.size() << " vertices): " << t.duration() << "ms" << std::endl;
 #endif
 
 #ifdef BENCHMARK
 t.start();
 #endif
 
+	const int indices[] = {-cols,		// top
+							-cols - 1,	// top left
+							-cols + 1,	// top right
+							-1,			// left
+							1,			// right
+							cols,		// bottom
+							cols - 1,	// bottom left
+							cols + 1	// bottom right
+							};
+
 	// Building the graph
-	for(int row = 1; row < rows - 1; ++row) {
-	    const float* p = depth_img.ptr<float>(row);
-	    const float* p_flow = opt_flow.ptr<float>(row);
+	for (std::vector<int>::iterator it = vertices.begin();
+			it != vertices.end(); it++) {
 
-	    p++; // skipping 1st column
-	    for(int col = 1; col < cols - 1; ++col) {
+		int row = *it / cols;
+		int col = *it % cols;
 
-	    	// Computing the distance to the neighbours of p
-	    	if (*p > kSubtractBackgroundZ) {
+		const float* p = depth_img.ptr<float>(row) + col;
+		const float* p_flow = opt_flow.ptr<float>(row) + col;
 
-	    		// Searching the neighbourhood
-	    		int p_idx = row*cols + col;
-	    		int indices[] = {-cols,		// top
-								-cols - 1,	// top left
-								-cols + 1,	// top right
-								-1,			// left
-								1,			// right
-								cols,		// bottom
-								cols - 1,	// bottom left
-								cols + 1	// bottom right
-	    						};
+		// Searching the neighbourhood
+		int p_idx = *it;
+		for (int k = 0; k < 8; k++) {
+			int nb_idx = p_idx + kSampleStep*indices[k];
+			if (nb_idx < 0 || index_map_[nb_idx] == -1) continue;
 
-	    		for (int k = 0; k < 8; k++) {
-	    			const float* nb = p + indices[k];
-	    			if (*nb < kSubtractBackgroundZ) continue;
+			const float* nb = p + kSampleStep*indices[k];
+			const float* nb_flow = p_flow + kSampleStep*indices[k];
+			float edge_weight = std::sqrt(kSampleStep*2.f + (*p - *nb)*(*p - *nb)*z_scale*z_scale);
+			float flow_cost = std::abs(*p_flow - *nb_flow);
+			float cost = edge_weight + flow_cost*pose::kOpticalFlowThreshold;
 
-	    			const float* nb_flow = p_flow + indices[k];
-	    			float edge_weight = std::sqrt(2.f + (*p - *nb)*(*p - *nb)*z_scale*z_scale);
-	    			float flow_cost = std::abs(*p_flow - *nb_flow);
-	    			float cost = edge_weight + flow_cost*pose::kOpticalFlowThreshold;
+			if (cost < edge_lenth_threshold_) {
+				assert(edge_weight > 0 && edge_weight < 10);
+				assert(index_map_[p_idx] >= 0 && index_map_[p_idx] < vertices.size());
 
-	    			if (cost < edge_lenth_threshold_) {
-	    				boost::add_edge(index_map_[p_idx], index_map_[p_idx + indices[k]], edge_weight, graph_);
-	    			}
-	    		}
-	    	}
+				if (index_map_[nb_idx] >= 0 && index_map_[nb_idx] < vertices.size()) {
+					//assert(index_map_[nb_idx] >= 0 && index_map_[nb_idx] < vertices.size());
 
-	    	p++;
-	    	p_flow++;
-	    }
+					boost::add_edge(index_map_[p_idx], index_map_[nb_idx], edge_weight, graph_);
+				}
+			}
+		}
+
 	}
+
+
+
+
 
 #ifdef BENCHMARK
 t.stop();
@@ -153,18 +163,19 @@ t.start();
     std::vector<int> component(boost::num_vertices(graph_));
     int num = boost::connected_components(graph_, &component[0]);
 
-    while (component.size() != index_map_.size()) index_map_.pop_back();
+    //while (component.size() != index_map_.size()) index_map_.pop_back();
 
     XYZPoint init_point;
     init_point.x = 0.0f;
     init_point.y = 0.0f;
     init_point.z = 0.0f;
     init_point.count = 0;
-	std::vector<XYZPoint> centroids(num, init_point);
-	centroids_ = std::vector<int>(num, -1);
+    init_point.index = -1;
+	//std::vector<XYZPoint> centroids(num, init_point);
+	centroids_ = std::vector<XYZPoint>(num, init_point);
     for (size_t i = 0; i < component.size(); ++i) {
 		pcl::PointXYZ point_pcl = cloud_->at(i);
-		XYZPoint* p = &centroids[component[i]];
+		XYZPoint* p = &centroids_[component[i]];
 		p->x += point_pcl.x;
 		p->y += point_pcl.y;
 		p->z += point_pcl.z;
@@ -172,8 +183,8 @@ t.start();
     }
 
     // Normalizing
-    for (std::vector<XYZPoint>::iterator it = centroids.begin();
-    		it != centroids.end(); ++it) {
+    for (std::vector<XYZPoint>::iterator it = centroids_.begin();
+    		it != centroids_.end(); ++it) {
     	it->x = it->x / it->count;
     	it->y = it->y / it->count;
     	it->z = it->z / it->count;
@@ -184,15 +195,14 @@ t.start();
 
     for (size_t i = 0; i < component.size(); ++i) {
 		pcl::PointXYZ point_pcl = cloud_->at(i);
-		XYZPoint p = centroids[component[i]];
-		if (p.count < pose::kConnectedComponentMinSize) continue;
+		XYZPoint p = centroids_[component[i]];
 
 		float delta = (p.x - point_pcl.x)*(p.x - point_pcl.x)
-						+ (p.y - point_pcl.y)*(p.y - point_pcl.y)
-						+ (p.z - point_pcl.z)*(p.z - point_pcl.z);
+								+ (p.y - point_pcl.y)*(p.y - point_pcl.y)
+								+ (p.z - point_pcl.z)*(p.z - point_pcl.z)*z_scale*z_scale;
 		if (delta < k_sqr_distances[component[i]]) {
 			k_sqr_distances[component[i]] = delta;
-			centroids_[component[i]] = i;
+			centroids_[component[i]].index = i;
 		}
     }
 
@@ -201,21 +211,19 @@ t.stop();
 std::cout << "(BENCHMARKING) Finding centroids: " << t.duration() << "ms" << std::endl;
 #endif
 
+
 #ifdef BENCHMARK
 t.start();
 #endif
 
-    int centroid_idx = -1;
-    for (std::vector<XYZPoint>::iterator it = centroids.begin();
-    		it != centroids.end(); ++it) {
-		centroid_idx++;
+    for (std::vector<XYZPoint>::iterator it = centroids_.begin();
+    		it != centroids_.end(); ++it) {
 
-		int k_index = centroids_[centroid_idx];
-		if (k_index < 0) continue;
+    	if (it->count < kMinMeshSize) continue;
 
 		std::vector<vertex_descriptor> p(boost::num_vertices(graph_));
 		std::vector<int> d(boost::num_vertices(graph_));
-		vertex_descriptor s = boost::vertex(k_index, graph_);
+		vertex_descriptor s = boost::vertex(it->index, graph_);
 
 		int K = static_cast<int>(round(num_interest_points_*static_cast<float>(it->count)/static_cast<float>(boost::num_vertices(graph_))));
 		for (int k = 0; k < K; k++) {
@@ -225,16 +233,19 @@ t.start();
 
 			boost::graph_traits <Graph>::vertex_iterator vi, vend;
 			int max_weight = -1;
-			int max_weight_vertex = -1;
-			for (boost::tie(vi, vend) = vertices(graph_); vi != vend; ++vi) {
+			int max_weight_vertex = -1;;
+
+			for (boost::tie(vi, vend) = boost::vertices(graph_); vi != vend; ++vi) {
+				//std::cout << cloud_->at(*vi).x << " " << cloud_->at(*vi).y << " " << d[*vi] << std::endl;
 				if (max_weight < d[*vi] && d[*vi] != infinity) {
 					max_weight = d[*vi];
 					max_weight_vertex = *vi;
 				}
 			}
 
+			assert(component[max_weight_vertex] == component[it->index]);
 			// adding a zero-weight edge
-			boost::add_edge(k_index, max_weight_vertex, 0, graph_);
+			boost::add_edge(it->index, max_weight_vertex, 0, graph_);
 			interest_points_.push_back(max_weight_vertex);
 
 			// Find the orientation (tracing the path back)
@@ -291,11 +302,12 @@ t.start();
     init_point.y = 0.0f;
     init_point.z = 0.0f;
     init_point.count = 0;
-	std::vector<XYZPoint> centroids(num, init_point);
-	centroids_ = std::vector<int>(num, -1);
+    init_point.index = -1;
+	//std::vector<XYZPoint> centroids(num, init_point);
+	centroids_ = std::vector<XYZPoint>(num, init_point);
     for (size_t i = 0; i < component.size(); ++i) {
 		pcl::PointXYZ point_pcl = cloud_->at(i);
-		XYZPoint *p = &centroids[component[i]];
+		XYZPoint *p = &centroids_[component[i]];
 		p->x += point_pcl.x;
 		p->y += point_pcl.y;
 		p->z += point_pcl.z;
@@ -313,8 +325,8 @@ t.start();
 
     // Normalizing
     int centroid_idx = -1;
-    for (std::vector<XYZPoint>::iterator it = centroids.begin();
-    		it != centroids.end(); ++it) {
+    for (std::vector<XYZPoint>::iterator it = centroids_.begin();
+    		it != centroids_.end(); ++it) {
 		centroid_idx++;
 
     	float count = static_cast<float>(it->count);
@@ -348,7 +360,7 @@ t.start();
 			continue;
 		}
 
-		centroids_[centroid_idx] = k_index;
+		centroids_[centroid_idx].index = k_index;
 
 		std::vector<vertex_descriptor> p(boost::num_vertices(graph_));
 		std::vector<int> d(boost::num_vertices(graph_));
@@ -404,22 +416,31 @@ void Mesh::colour_mat(cv::Mat& image) {
     	colours.push_back(cv::Scalar(rand() % 255, rand() % 255, rand() % 255));
     }
 
-	for(int row = 0; row < image.rows; ++row) {
+	for(int row = 0; row < image.rows; row += kSampleStep) {
 	    uchar* p = image.ptr<uchar>(row);
-	    for(int col = 0; col < image.cols; ++col) {
+	    for(int col = 0; col < image.cols; col += kSampleStep) {
 	    	int idx = row*image.cols + col;
-	    	if (idx >= index_map_.size())
-	    		break;
 
-	    	if (index_map_[idx] < 0) {
-	    		p += 3;
-	    		continue;
+	    	if (index_map_[idx] >= 0 && index_map_[row*image.cols + col] < component.size()) {
+
+	    		if (centroids_[component[index_map_[row*image.cols + col]]].index == index_map_[row*image.cols + col]) {
+					*p = (uchar)255; p++;
+					*p = (uchar)255; p++;
+					*p = (uchar)255; p++;
+	    		} else {
+					cv::Scalar colour = colours[component[index_map_[row*image.cols + col]]];
+					*p = (uchar)colour[0]; p++;
+					*p = (uchar)colour[1]; p++;
+					*p = (uchar)colour[2]; p++;
+	    		}
+	    	} else {
+				*p = (uchar)128; p++;
+				*p = (uchar)128; p++;
+				*p = (uchar)128; p++;
+	    		//std::cerr << "Skipping for " << row << " " << col << std::endl;
 	    	}
 
-	    	cv::Scalar colour = colours[component[index_map_[row*image.cols + col]]];
-	    	*p = (uchar)colour[0]; p++;
-	    	*p = (uchar)colour[1]; p++;
-	    	*p = (uchar)colour[2]; p++;
+	    	p += 3*(kSampleStep - 1);
 	    }
 	}
 }
@@ -445,7 +466,7 @@ void Mesh::colour_cloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_pcl) {
 		new_point.z = cloud_->at(i).z;
 		new_point.rgb = colours[component[i]];
 
-		if (centroids_[component[i]] == i) {
+		if (centroids_[component[i]].index == i) {
 			new_point.rgb = color_global.float_value;
 		}
 
@@ -529,14 +550,14 @@ void Mesh::add_point(float x, float y, float z) {
 }
 
 void Mesh::mark_centroids(cv::Mat& image, float colour) {
-	for (std::vector<int>::iterator it = centroids_.begin(); it != centroids_.end(); ++it) {
-		if (*it < 0) continue; // CC is too small
+	for (std::vector<XYZPoint>::iterator it = centroids_.begin(); it != centroids_.end(); ++it) {
+		if (it->count < kMinMeshSize) continue;
 
-		int x = cloud_->points[*it].x;
-		int y = cloud_->points[*it].y;
+		int x = cloud_->points[it->index].x;
+		int y = cloud_->points[it->index].y;
 
 
-		cv::circle(image, cv::Point(x, y), 1.0, colour, -1, 8);
+		cv::circle(image, cv::Point(x, y), 3.0, cv::Scalar(255, 255, 255), -1, 8);
 
 		//std::cerr << "Centroid: [" << *it << "] X: " << x << " Y: " << y << " Z: " << cloud_->points[*it].z << std::endl;
 	}

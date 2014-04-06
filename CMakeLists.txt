@@ -62,8 +62,17 @@ add_library(mesh ${MESH_FILES})
 target_link_libraries(mesh ${LIBRARIES})
 
 add_executable(estimate_pose ${SRC_FILES})
+add_executable(extract_keypoints src/tools/extract_keypoints.cpp
+									src/data_io.cpp
+									src/cornell/backend.cpp
+              						src/ethz/backend.cpp
+              						src/stanford/backend.cpp
+              						src/bonn/backend.cpp
+              						src/data_io_backend.cpp
+              						src/keyframe.cpp)
 
 target_link_libraries(estimate_pose mesh ${LIBRARIES})
+target_link_libraries(extract_keypoints ${LIBRARIES})
 
 ################################
 # LibSVM

@@ -13,26 +13,26 @@ namespace opflow {
 }
 
 namespace classifier {
-	const float kConfidenceThreshold = 0.6f;
+	const float kConfidenceThreshold = 0.85f;
 }
 
 namespace io {
 	enum Dataset { ETHZ, CornellCAD120, StanfordEval, Bonn };
 
-	const Dataset kCurrentDataset = Bonn;
+	const Dataset kCurrentDataset = StanfordEval;
 
 	const int kInputWidth = 144;
 	const int kInputHeight = 176;
 
 	const std::string kTrainingDataPath = "";
-	const int kNegativeToPositiveRatio = 3;
+	const int kNegativeToPositiveRatio = 2;
 }
 
 namespace pose {
 
 	const float kOpticalFlowThreshold = 90;//0.025f;
 	const float kDownsampleCellSize = 3.3f;
-	const float kMeshDistanceThreshold = 4.0f;
+	const float kMeshDistanceThreshold = 3.0f;
 	const float kOrientationDelta = 20;
 
 	const int kDescriptorSize = 41;

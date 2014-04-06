@@ -56,18 +56,27 @@ void ClassifierSVM::create_feature_vector(const cv::Mat image) {
 void ClassifierSVM::predict_probability(const cv::Mat image, BodyPart* body_part, float* confidence) {
 	create_feature_vector(image);
 
+	static int labels[] = {2,3,0,1};
+
 	double *prob_estimates = (double *) malloc(model_->nr_class*sizeof(double));
 	double predict_label;
 
 	predict_label = svm_predict_probability(model_, features_, prob_estimates);
-	float max_probabilty;
+	float max_probabilty = -1.f;
+	int label = 0;
+
 	for(int j = 0; j< model_->nr_class; j++) {
-		if (max_probabilty < prob_estimates[j])
+		if (labels[j] == 0) continue;
+
+		if (prob_estimates[j] > kConfidenceThreshold
+				&& max_probabilty < prob_estimates[j]) {
 			max_probabilty = prob_estimates[j];
+			label = labels[j];
+		}
 	}
 
-	*body_part = static_cast<BodyPart>(predict_label);
-	*confidence = max_probabilty;
+	*body_part = static_cast<BodyPart>(label);
+	*confidence = (label != 0) ? max_probabilty : prob_estimates[0];
 }
 
 

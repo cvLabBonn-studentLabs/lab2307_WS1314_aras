@@ -10,6 +10,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "svm.h"
+#include "constants.h"
 
 
 namespace classifier {

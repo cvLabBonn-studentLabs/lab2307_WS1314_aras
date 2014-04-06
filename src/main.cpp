@@ -13,12 +13,14 @@
 // TODO: REMOVE
 #include <pcl/visualization/cloud_viewer.h>
 
-#define BENCHMARK 1
+//#define BENCHMARK 1
 #define DEBUG 1
 
 #ifdef BENCHMARK
 timer::Timer t;
 #endif
+
+const float infinity = 99999.9f;
 
 void mark_body_part(cv::Mat& image, cv::Point centre, classifier::BodyPart body_part) {
 
@@ -81,8 +83,9 @@ int main_(int argc, char * argv[]) {
 
 int main(int argc, char * argv[]) {
 
-	const int start_from_frame = 0;
-	const float distance_threshold = 15.f;
+	const int start_from_frame = 15;
+	const int stop_at_frame = 200;
+	const float distance_threshold = 25.f;
 	const int num_attr = 1681;
 	const int K = pose::kNumInterestPoints;
 
@@ -102,9 +105,16 @@ int main(int argc, char * argv[]) {
 	int right_hand_tp = 0;
 	int right_hand_fn = 0;
 
+	int head_as_hand = 0;
+	int hand_as_head = 0;
+
+	std::vector<float> rms_head;
+	std::vector<float> rms_hand;
+
 	io::DataIO data(io::kCurrentDataset);
 	classifier::ClassifierSVM svm(num_attr);
 	svm.read_model("/media/neek/DATA/MAINF2307/data/Stanford_training/head_hands/data.scale.model");
+	//svm.read_model("/home/neek/coding/mainf2307/data/bonn/training.scale.model");
 
 	opflow::OFTensor<float> aImage1, aImage2;
 	opflow::OFTensor<float> aForward, aBackward;
@@ -136,9 +146,17 @@ std::cout << "(BENCHMARKING) Reading data: " << t.duration() << "ms" << std::end
 			continue;
 		}
 
+		if (frame_idx > stop_at_frame) {
+			break;
+		}
+
 		bool head_detected = false;
 		bool left_hand_detected = false;
 		bool right_hand_detected = false;
+
+		float min_dist_head = 99999.9f;
+		float min_dist_lhand = 99999.9f;
+		float min_dist_rhand = 99999.9f;
 
 		// For evaluation purposes
 		cv::Point centre_truth_head, centre_truth_left_hand, centre_truth_right_hand,
@@ -236,7 +254,7 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 		// for prediction step
 		depth_image.convertTo(depth_image, CV_32F);
 		cv::normalize(depth_image, depth_image, -1.0, 1.0, cv::NORM_MINMAX);
-		mesh.mark_centroids(depth_image_display, 1.0);
+		//mesh.mark_centroids(depth_image_display, 1.0);
 //
 		keyframe::Keyframe kframe(depth_image);
 //		cv::imshow("Depth image", depth_image);
@@ -256,20 +274,21 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 			orientation[2] = keypoints[i].x;
 			orientation[3] = keypoints[i].y;
 
-			//mark_body_part(segments, cv::Point(key_orientations[i].x, key_orientations[i].y), classifier::HEAD);
-			mark_body_part(segments, centre, classifier::RIGHT_FOOT);
+//			mark_body_part(segments, cv::Point(key_orientations[i].x, key_orientations[i].y), classifier::HEAD);
+//			mark_body_part(segments, centre, classifier::RIGHT_FOOT);
 
 			if (!kframe.extract_part(patch, centre, orientation, pose::kDescriptorSize)) {
 				//std::cerr << "Skipping" << std::endl;
 				continue;
 			}
 
-			cv::Mat part_copy;
-			patch.copyTo(part_copy);
-			cv::normalize(part_copy, part_copy, 0.0, 255.0, cv::NORM_MINMAX);
-			part_copy.convertTo(part_copy, CV_8U);
-
+//			cv::Mat part_copy;
+//			patch.copyTo(part_copy);
+//			cv::normalize(part_copy, part_copy, 0.0, 255.0, cv::NORM_MINMAX);
+//			part_copy.convertTo(part_copy, CV_8U);
+//
 //			cv::imshow("Interest Point", part_copy);
+//			cv::imwrite("interest_point.png", part_copy);
 //			cv::waitKey(0);
 
 			//std::cerr << "Prediction: " << svm.predict(part) << std::endl;
@@ -286,30 +305,37 @@ t.stop();
 std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::endl;
 #endif
 			/******************************************/
-			std::cout << "CONF = " << confidence << std::endl;
-			std::cout << "BP = " << body_part << std::endl;
-			cv::imshow("Interest Point", part_copy);
-			cv::waitKey(0);
+//			std::cout << "CONF = " << confidence << std::endl;
+//			std::cout << "BP = " << body_part << std::endl;
+//			cv::imshow("Interest Point", part_copy);
+//			cv::waitKey(0);
 
 
-			if (confidence > classifier::kConfidenceThreshold) {
-				mark_body_part(depth_image_display, centre, body_part);
-
-
+			//if (confidence > classifier::kConfidenceThreshold) {
+				//mark_body_part(depth_image_display, centre, body_part);
 
 			switch(body_part) {
 			case classifier::HEAD:
 			{
 				if (centre_truth_head.x > 0) {
 					float dist = l2norm(centre, centre_truth_head);
-					if (dist < distance_threshold && !head_detected) {
-						head_tp += 1;
-						//std::cerr << "Head detected at: " << dist << std::endl;
-						head_detected = true;
+					if (dist < distance_threshold) {
+						min_dist_head = std::min(min_dist_head, dist);
+
+						if (!head_detected) {
+							head_tp += 1;
+							//std::cerr << "Head detected at: " << dist << std::endl;
+							head_detected = true;
+						}
 					} else {
 						head_fp++;
-					}
 
+						float dist_to_hands = std::min(l2norm(centre, centre_truth_left_hand),
+																l2norm(centre, centre_truth_right_hand));
+						if (dist_to_hands < distance_threshold) {
+							head_as_hand++;
+						}
+					}
 				}
 			}
 			break;
@@ -321,17 +347,27 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 					//mark_body_part(depth_image_display, centre_truth_right_hand, classifier::LEFT_FOOT);
 					float dist = std::min(l2norm(centre, centre_truth_left_hand),
 											l2norm(centre, centre_truth_right_hand));
-					if (dist < distance_threshold && !left_hand_detected) {
+					if (dist < distance_threshold) {
+
+						if (!left_hand_detected || min_dist_lhand > dist) {
+							if (left_hand_detected && min_dist_rhand > min_dist_lhand) {
+								min_dist_rhand = min_dist_lhand;
+								right_hand_detected = true;
+							}
+
+							min_dist_lhand = dist;
+							left_hand_detected = true;
+						}
+
 						hand_tp++;
-						left_hand_detected = true;
-					} else if (dist < distance_threshold && !right_hand_detected) {
-						hand_tp++;
-						right_hand_detected = true;
 					} else {
 						hand_fp++;
-					}
 
-					//std::cerr << "Hand detected at: " << dist << std::endl;
+						float dist_to_head = l2norm(centre, centre_truth_head);
+						if (dist_to_head < distance_threshold) {
+							hand_as_head++;
+						}
+					}
 				}
 			}
 			break;
@@ -339,7 +375,7 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 				break;
 			}
 
-			}
+			//}
 
 
 			/* TODO: Debug
@@ -362,19 +398,23 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 
 		}
 
+		if (head_detected) rms_head.push_back(min_dist_head);
+		if (left_hand_detected) rms_hand.push_back(min_dist_lhand);
+		if (right_hand_detected) rms_hand.push_back(min_dist_rhand);
+
 		if (centre_truth_head.x > 0 && !head_detected) head_fn++;
 		if (centre_truth_left_hand.x > 0 && !left_hand_detected) hand_fn++;
 		if (centre_truth_right_hand.x > 0 && !right_hand_detected) hand_fn++;
 
-		cv::imshow("Segments", segments);
-		cv::imshow("Body parts", depth_image_display);
-		cv::imwrite("body_part.png", depth_image_display);
-		cv::imwrite("segments.png", segments);
-
-		cv::normalize(image_of, image_of, 0, 128, cv::NORM_MINMAX);
-		image_of.convertTo(image_of, CV_8UC1);
-		cv::imwrite("of.png", image_of);
-		cv::waitKey(0);
+//		cv::imshow("Segments", segments);
+//		cv::imshow("Body parts", depth_image_display);
+//		cv::imwrite("body_part.png", depth_image_display);
+//		cv::imwrite("segments.png", segments);
+//
+//		cv::normalize(image_of, image_of, 0, 128, cv::NORM_MINMAX);
+//		image_of.convertTo(image_of, CV_8UC1);
+//		cv::imwrite("of.png", image_of);
+//		cv::waitKey(0);
 
 		//cloud = boost::make_shared<pcl::PointCloud<pcl::PointXYZ> >();
 
@@ -383,11 +423,24 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 		//break;
 	}
 
+	std::cout << "NumOfFrames: " << frame_idx << std::endl;
+
+	std::cout << "RMS_head (" << rms_head.size() << ")" << std::endl;
+	for (int i = 0; i < rms_head.size(); i++) std::cout << rms_head[i] << ", ";
+	std::cout << std::endl;
+
+	std::cout << "RMS_hand (" << rms_hand.size() << ")" << std::endl;
+	for (int i = 0; i < rms_hand.size(); i++) std::cout << rms_hand[i] << ", ";
+	std::cout << std::endl;
+
 	std::cout << "Head Precision: " << precision(head_tp, head_fp) << std::endl;
 	std::cout << "Hand Precision: " << precision(hand_tp, hand_fp) << std::endl;
 
 	std::cout << "Head Recall: " << recall(head_tp, head_fn) << std::endl;
 	std::cout << "Hand Recall: " << recall(hand_tp, hand_fn) << std::endl;
+
+	std::cout << "Head TP: " << head_tp << " FP: " << head_fp << " as hand: " << head_as_hand <<  std::endl;
+	std::cout << "Hand TP: " << hand_tp << " FP: " << hand_fp << " as head: " << hand_as_head << std::endl;
 
 	return 0;
 }

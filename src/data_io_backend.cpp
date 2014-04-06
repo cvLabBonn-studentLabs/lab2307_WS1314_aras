@@ -69,11 +69,18 @@ void DataIOBackend::extract_parts() {}
 
 void DataIOBackend::image_to_string(cv::Mat image, std::stringstream& line) {
 	assert(image.type() == CV_8UC1);
+
 	int index = 1;
 	for(int row = 0; row < image.rows; ++row) {
 	    uchar* p = image.ptr(row);
 	    for(int col = 0; col < image.cols; ++col) {
-	    	line << " "<< index++ << ":" << static_cast<int>(*p++);
+	    	//std::cout << index << ":" << static_cast<int>(*p);
+
+	    	//if (index == 82) std::cout << ". 140 Done! " << line.str() << std::endl;
+	    	std::stringstream data;
+	    	data << static_cast<int>(image.at<uchar>(row, col));
+	    	line << " " << index++ << ":" << data.str();
+	    	//std::cout << ". Done. " << std::endl;
 	    }
 	}
 }
@@ -94,10 +101,18 @@ void DataIOBackend::extract_positive_part(cv::Mat& frame,
 
 	centre.x = x2;
 	centre.y = y2;
-	orientation[0] = x1;
-	orientation[1] = y1;
-	orientation[2] = x2;
-	orientation[3] = y2;
+
+	if (id == 1) {	// HEAD
+		orientation[0] = x2;
+		orientation[1] = y2;
+		orientation[2] = x1;
+		orientation[3] = y1;
+	} else {
+		orientation[0] = x1;
+		orientation[1] = y1;
+		orientation[2] = x2;
+		orientation[3] = y2;
+	}
 
 	keyframe::Keyframe kframe(frame);
 	kframe.extract_part(part, centre, orientation, pose::kDescriptorSize);
@@ -106,6 +121,11 @@ void DataIOBackend::extract_positive_part(cv::Mat& frame,
 		std::cout << centre.x << " " << centre.y << std::endl;
 		return;
 	}
+
+	std::cout << "Extracted " << centre.x << " " << centre.y << std::endl;
+
+//	cv::imshow("Part", part);
+//	cv::waitKey(0);
 
 	std::stringstream line;
 	image_to_string(part, line);

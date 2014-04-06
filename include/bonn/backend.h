@@ -38,6 +38,7 @@ private:
 	int frame_num_;
 	bool seq_update_;
 	std::vector<int> ground_truth_;
+	std::vector<int> ground_truths_;
 	static const std::string kPath;
 	static const int kLabelNum = 5;
 };

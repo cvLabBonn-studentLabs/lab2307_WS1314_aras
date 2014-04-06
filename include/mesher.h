@@ -49,6 +49,7 @@ namespace mesher {
 		float y;
 		float z;
 		int count;
+		int index;
 	} XYZPoint;
 
 	typedef boost::property<boost::edge_weight_t, float> EdgeProperty;
@@ -99,14 +100,14 @@ namespace mesher {
 		float edge_lenth_threshold_;
 		Graph graph_;
 		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_;
-		std::vector<int> centroids_;
+		std::vector<XYZPoint> centroids_;
 		std::vector<int> index_map_;
 		std::vector<int> interest_points_;
 		std::vector<int> interest_points_o_;
 
 		static const int kCenterMassNumNeighbours = 5;
-		static const int kMinMeshSize = 150;
-		static const float kSubtractBackgroundZ = 0.1f;
+		static const int kMinMeshSize = 5;
+		static const float kSubtractBackgroundZ = 0.f;
 		static const int kSampleStep = 2;
 	};
 

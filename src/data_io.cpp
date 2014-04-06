@@ -85,9 +85,7 @@ namespace io {
 	}
 
 	void DataIO::extract_data() {
-		std::cout << "Extracting training data" << std::endl;
 		backend_->extract_parts();
-		std::cout << "Done" << std::endl;
 	}
 
 	void DataIO::png_to_pointcloud(const cv::Mat& depth_img,

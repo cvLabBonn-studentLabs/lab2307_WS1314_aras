@@ -13,7 +13,27 @@ namespace io {
 
 	const std::string DataIOBonn::kPath = "/media/neek/DATA/MAINF2307/data/bonn";
 
-	DataIOBonn::DataIOBonn() : seq_num_(1), frame_num_(0), seq_update_(true) {}
+	DataIOBonn::DataIOBonn() : seq_num_(1), frame_num_(0), seq_update_(true) {
+
+		std::stringstream ss;
+		ss << "labels.txt";
+		std::string fname = "./" + ss.str();
+		std::ifstream source;
+		source.open(fname.c_str(), std::ios_base::in);
+
+		for(std::string line; std::getline(source, line); )
+		{
+			std::istringstream in(line);
+
+			for (int i = 0; i < 2*kLabelNum; i++) {
+				int x, y;
+				in >> x >> y;
+				ground_truths_.push_back(x);
+				ground_truths_.push_back(y);
+			}
+		}
+
+	}
 	DataIOBonn::DataIOBonn(int seq, int frame) : seq_num_(seq), frame_num_(frame) {}
 	DataIOBonn::~DataIOBonn() {}
 
@@ -64,67 +84,32 @@ namespace io {
 		    }
 		}
 
-		if (seq_update_) {
-			std::stringstream ss;
-			ss << seq_num_ << ".txt";
-			std::string fname = kPath + "/" + ss.str();
-			std::ifstream source;
-			source.open(fname.c_str(), std::ios_base::in);
-
-			for(std::string line; std::getline(source, line); )
-			{
-			    std::istringstream in(line);
-
-			    for (int i = 0; i < kLabelNum; i++) {
-			    	int x, y, width, height;
-			    	in >> x >> y >> width >> height;
-			    	ground_truth_.push_back(x);
-			    	ground_truth_.push_back(y);
-			    }
-			}
-			seq_update_ = false;
+		// Ground truth
+		int base_idx = 4*frame_num_*kLabelNum;
+		ground_truth_ = std::vector<int>(kLabelNum*4);
+		for (int i = 0; i < 4*kLabelNum; i++) {
+			ground_truth_[i] = ground_truths_[base_idx + i];
 		}
 
-		// Ground truth
-		int base_idx = 2*frame_num_*kLabelNum;
-
 		// HEAD
-		centre_truth_head.x = ground_truth_[base_idx];
-		centre_truth_head.y = ground_truth_[base_idx + 1];
+		centre_truth_head.x = ground_truth_[4];
+		centre_truth_head.y = ground_truth_[5];
 
 		// LEFT HAND
-		centre_truth_left_hand.x = to_x(ground_truth_[base_idx + 2]);
-		centre_truth_left_hand.y = to_y(ground_truth_[base_idx + 3]);
+		centre_truth_left_hand.x = ground_truth_[0];
+		centre_truth_left_hand.y = ground_truth_[1];
 
 		// RIGHT HAND
-		centre_truth_right_hand.x = to_x(ground_truth_[base_idx + 4]);
-		centre_truth_right_hand.y = to_y(ground_truth_[base_idx + 5]);
+		centre_truth_right_hand.x = ground_truth_[8];
+		centre_truth_right_hand.y = ground_truth_[9];
 
 		// LEFT LEG
-		centre_truth_left_foot.x = to_x(ground_truth_[base_idx + 6]);
-		centre_truth_left_foot.y = to_y(ground_truth_[base_idx + 7]);
+		centre_truth_left_foot.x = ground_truth_[12];
+		centre_truth_left_foot.y = ground_truth_[13];
 
 		// RIGHT LEG
-		centre_truth_right_foot.x = to_x(ground_truth_[base_idx + 8]);
-		centre_truth_right_foot.y = to_y(ground_truth_[base_idx + 9]);
-
-
-//		int x = to_x(centre_truth_head.x);
-//		int y = to_y(centre_truth_head.y);
-//
-//		cv::Mat display;
-//		cv::normalize(frame_depth, display, 0.0, 255.0, cv::NORM_MINMAX);
-//		display.convertTo(display, CV_8UC1);
-//
-//		cv::circle(display,
-//				cv::Point(x, y),
-//				 3.0,
-//				 cv::Scalar( 255, 255, 255 ),
-//				 -1,
-//				 8);
-//
-//		cv::imshow("Testing image", display);
-//		cv::waitKey(0);
+		centre_truth_right_foot.x = ground_truth_[16];
+		centre_truth_right_foot.y = ground_truth_[17];
 
 		frame_num_++;
 		return true;
@@ -135,20 +120,21 @@ namespace io {
 											cv::Point& centre_right_hand,
 											cv::Point& centre_left_foot,
 											cv::Point& centre_right_foot) {
-		centre_head.x = centre_truth_head.x;
-		centre_head.y = centre_truth_head.y;
 
-		centre_left_hand.x = centre_truth_left_hand.x;
-		centre_left_hand.y = centre_truth_left_hand.y;
+		centre_head.x = to_x(centre_truth_head.x);
+		centre_head.y = to_y(centre_truth_head.y);
 
-		centre_right_hand.x = centre_truth_right_hand.x;
-		centre_right_hand.y = centre_truth_right_hand.y;
+		centre_left_hand.x = to_x(centre_truth_left_hand.x);
+		centre_left_hand.y = to_y(centre_truth_left_hand.y);
 
-		centre_left_foot.x = centre_truth_left_foot.x;
-		centre_left_foot.y = centre_truth_left_foot.y;
+		centre_right_hand.x = to_x(centre_truth_right_hand.x);
+		centre_right_hand.y = to_y(centre_truth_right_hand.y);
 
-		centre_right_foot.x = centre_truth_right_foot.x;
-		centre_right_foot.y = centre_truth_right_foot.y;
+		centre_left_foot.x = to_x(centre_truth_left_foot.x);
+		centre_left_foot.y = to_y(centre_truth_left_foot.y);
+
+		centre_right_foot.x = to_x(centre_truth_right_foot.x);
+		centre_right_foot.y = to_y(centre_truth_right_foot.y);
 	}
 
 	void DataIOBonn::extract_parts() {
@@ -178,63 +164,65 @@ namespace io {
 			frame.convertTo(frame, CV_8UC1);
 
 			// Head
-			extract_positive_part(frame, data,
-									centre_truth_head.x, centre_truth_head.y + 15,
-									centre_truth_head.x, centre_truth_head.y + 13,
-									classifier::HEAD);
+			if (ground_truth_[6] > 0 && ground_truth_[4] > 0) {
+				extract_positive_part(frame, data,
+										ground_truth_[4], ground_truth_[5],
+										ground_truth_[6], ground_truth_[7],
+										classifier::HEAD);
 
-//			positive_centres.push_back(f.markers[3].x);
-//			positive_centres.push_back(f.markers[3].y);
-//
-//			// Left hand
-//			if (f.markers[28].cond > 0 && f.markers[24].cond > 0) {
-//				extract_positive_part(frame, head_data,
-//										f.markers[28].x, f.markers[28].y,
-//										f.markers[24].x, f.markers[24].y,
-//										classifier::LEFT_HAND);
-//
-//				positive_centres.push_back(f.markers[28].x);
-//				positive_centres.push_back(f.markers[28].y);
-//			}
-//
-//			// Right hand
-//			if (f.markers[19].cond > 0 && f.markers[16].cond > 0) {
-//				extract_positive_part(frame, head_data,
-//										f.markers[19].x, f.markers[19].y,
-//										f.markers[16].x, f.markers[16].y,
-//										classifier::RIGHT_HAND);
-//
-//				positive_centres.push_back(f.markers[19].x);
-//				positive_centres.push_back(f.markers[19].y);
-//			}
-//
-//			// Left leg
-//			/*if (f.markers[35].cond > 0 && f.markers[37].cond > 0) {
-//				extract_positive_part(frame, head_data,
-//										f.markers[35].x, f.markers[35].y,
-//										f.markers[37].x, f.markers[37].y,
-//										classifier::LEFT_FOOT);
-//
-//				positive_centres.push_back(f.markers[35].x);
-//				positive_centres.push_back(f.markers[35].y);
-//			}
-//
-//			// Right leg
-//			if (f.markers[43].cond > 0 && f.markers[41].cond > 0) {
-//				extract_positive_part(frame, head_data,
-//										f.markers[43].x, f.markers[43].y,
-//										f.markers[41].x, f.markers[41].y,
-//										classifier::RIGHT_FOOT);
-//
-//				positive_centres.push_back(f.markers[43].x);
-//				positive_centres.push_back(f.markers[43].y);
-//			}*/
-//
-//			extract_negative_part(frame, head_data, positive_centres);
+				positive_centres.push_back(ground_truth_[4]);
+				positive_centres.push_back(ground_truth_[5]);
+			}
+
+			// Left hand
+			if (ground_truth_[0] > 0 && ground_truth_[2] > 0) {
+				extract_positive_part(frame, data,
+						ground_truth_[2], ground_truth_[3],
+						ground_truth_[0], ground_truth_[1],
+						classifier::LEFT_HAND);
+
+				positive_centres.push_back(ground_truth_[0]);
+				positive_centres.push_back(ground_truth_[1]);
+			}
+
+			// Right hand
+			if (ground_truth_[8] > 0 && ground_truth_[10] > 0) {
+				extract_positive_part(frame, data,
+						ground_truth_[10], ground_truth_[11],
+						ground_truth_[8], ground_truth_[9],
+						classifier::RIGHT_HAND);
+
+				positive_centres.push_back(ground_truth_[8]);
+				positive_centres.push_back(ground_truth_[9]);
+			}
+
+			// Left leg
+			if (ground_truth_[12] > 0 && ground_truth_[14] > 0) {
+				extract_positive_part(frame, data,
+						ground_truth_[14], ground_truth_[15],
+						ground_truth_[12], ground_truth_[13],
+						classifier::LEFT_FOOT);
+
+				positive_centres.push_back(ground_truth_[12]);
+				positive_centres.push_back(ground_truth_[13]);
+			}
+
+			// Right leg
+			if (ground_truth_[16] > 0 && ground_truth_[17] > 0) {
+				extract_positive_part(frame, data,
+						ground_truth_[18], ground_truth_[19],
+						ground_truth_[16], ground_truth_[17],
+						classifier::RIGHT_FOOT);
+
+				positive_centres.push_back(ground_truth_[16]);
+				positive_centres.push_back(ground_truth_[17]);
+			}
+
+			extract_negative_part(frame, data, positive_centres);
 		}
 	}
 
-	int DataIOBonn::to_x(float x_) { return (x_ - 140.f)/2.5f; };
-	int DataIOBonn::to_y(float y_) { return (y_ - 20.f)/2.5f; };
+	int DataIOBonn::to_x(float x_) { return x_; };
+	int DataIOBonn::to_y(float y_) { return y_; };
 
 }
