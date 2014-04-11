@@ -9,7 +9,7 @@
 #define CONSTANTS_H_
 
 namespace opflow {
-	const bool ON = true;
+	const bool ON = false;
 }
 
 namespace classifier {
@@ -17,7 +17,7 @@ namespace classifier {
 }
 
 namespace io {
-	enum Dataset { ETHZ, CornellCAD120, StanfordEval, Bonn };
+	enum Dataset { /*ETHZ, CornellCAD120,*/ StanfordEval, Bonn };
 
 	const Dataset kCurrentDataset = Bonn;
 

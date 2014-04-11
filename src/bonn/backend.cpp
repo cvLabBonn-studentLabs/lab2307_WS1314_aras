@@ -11,13 +11,13 @@
 
 namespace io {
 
-	const std::string DataIOBonn::kPath = "/media/neek/DATA/MAINF2307/data/bonn";
+	const std::string DataIOBonn::kPath = "data/bonn";
 
 	DataIOBonn::DataIOBonn() : seq_num_(1), frame_num_(0), seq_update_(true) {
 
 		std::stringstream ss;
 		ss << "labels.txt";
-		std::string fname = "./" + ss.str();
+		std::string fname = kPath + "/" + ss.str();
 		std::ifstream source;
 		source.open(fname.c_str(), std::ios_base::in);
 
@@ -113,7 +113,7 @@ namespace io {
 
 		frame_num_++;
 
-		cv::normalize(frame_depth, frame_depth, 0.f, 1.f, cv::NORM_MINMAX);
+//		cv::normalize(frame_depth, frame_depth, 0.f, 1.f, cv::NORM_MINMAX);
 
 		return true;
 	}

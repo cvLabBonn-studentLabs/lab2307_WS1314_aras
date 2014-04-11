@@ -68,9 +68,7 @@ void ClassifierSVM::predict_probability(const cv::Mat image, BodyPart* body_part
 	float max_probabilty = -1.f;
 	int label = 0;
 
-//	std::cerr << "Prediction: " << predict_label << std::endl;
 	for(int j = 0; j< model_->nr_class; j++) {
-//		std::cerr << "class " << j << ": " << prob_estimates[j] << std::endl;
 		if (labels[j] == 0) continue;
 
 		if (prob_estimates[j] > kConfidenceThreshold
@@ -81,8 +79,6 @@ void ClassifierSVM::predict_probability(const cv::Mat image, BodyPart* body_part
 	}
 
 	*body_part = static_cast<BodyPart>(label);
-	//std::cerr << std::endl;
-//	*confidence = (label != 0) ? max_probabilty : prob_estimates[0];
 }
 
 

@@ -436,11 +436,6 @@ std::cout << "(BENCHMARKING) Finding IP: " << t.duration() << "ms" << std::endl;
 void Mesh::colour_mat(cv::Mat& image) {
 	assert(image.type() == CV_8UC3);
 
-	// The number of connected components
-//    std::vector<int> component(boost::num_vertices(graph_));
-//    int num = boost::connected_components(graph_, &component[0]);
-//    std::cout << "Num of CC (colouring): " << num << std::endl;
-
     std::vector<cv::Scalar> colours;
     srand (time(NULL));
     for (size_t i = 0; i < num_of_cc_; i++) {

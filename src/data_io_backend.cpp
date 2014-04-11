@@ -74,13 +74,9 @@ void DataIOBackend::image_to_string(cv::Mat image, std::stringstream& line) {
 	for(int row = 0; row < image.rows; ++row) {
 		float* p = image.ptr<float>(row);
 	    for(int col = 0; col < image.cols; ++col) {
-	    	//std::cout << index << ":" << static_cast<int>(*p);
-
-	    	//if (index == 82) std::cout << ". 140 Done! " << line.str() << std::endl;
 	    	std::stringstream data;
 	    	data << image.at<float>(row, col);
 	    	line << " " << index++ << ":" << data.str();
-	    	//std::cout << ". Done. " << std::endl;
 	    }
 	}
 }
@@ -160,11 +156,6 @@ void DataIOBackend::extract_negative_part(cv::Mat& frame,
 				in_collision = true;
 				break;
 			}
-
-//			if ((std::abs(topleft.x - pos_x) < pose::kDescriptorSize)
-//					|| (std::abs(topleft.y - pos_y) < pose::kDescriptorSize)) {
-//
-//			}
 		}
 
 		if (in_collision) continue;

@@ -1,5 +1,4 @@
 #include "data_io.h"
-//#include "segmentation.h"
 #include "mesher.h"
 #include "constants.h"
 #include "keyframe.h"
@@ -10,21 +9,30 @@
 #include "ldof.h"
 #include "CFilter.h"
 
-// TODO: REMOVE
-//#include <pcl/visualization/cloud_viewer.h>
-
 //#define BENCHMARK 1
 //#define DEBUG 1
 
-#ifdef BENCHMARK
-timer::Timer t;
-#endif
+/////////////////////////////// Constants and Globals /////////////////////////
 
 const float infinity = 99999.9f;
 static cv::Mat depth_image;
 static mesher::Mesh mesh(pose::kMeshDistanceThreshold, pose::kNumInterestPoints);
 
+// Setting the frame range
+const int start_from_frame = 260;	// For StanfordEval: 1700
+const int stop_at_frame = 600;		// For StanfordEval: 2400
+
+const int num_attr = pose::kDescriptorSize*pose::kDescriptorSize;
+const int num_classes = 5;
+
+///////////////////////////////////////////////////////////////////////////////
+
+#ifdef BENCHMARK
+timer::Timer t;
+#endif
+
 // FIXME: consider removal
+#ifdef DEBUG
 void mark_body_part(cv::Mat& image, cv::Point centre, classifier::BodyPart body_part) {
 
 //	std::cout << "Marking BP: " << body_part << " : " << centre << std::endl;
@@ -63,8 +71,21 @@ void mark_body_part(cv::Mat& image, cv::Point centre, classifier::BodyPart body_
 	}
 }
 
+static void onMouse( int event, int x, int y, int, void* )
+{
+    if( event != cv::EVENT_LBUTTONDOWN )
+        return;
+
+    std::cout << "(" << x << ", " << y << ")" << "= " << depth_image.at<float>(y, x) << std::endl;
+}
+#endif
+
+
+
 float l2norm(cv::Point a, cv::Point b) {
-	return sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+	return sqrt((a.x - b.x)*(a.x - b.x)
+					+ (a.y - b.y)*(a.y - b.y)
+					+ (depth_image.at<float>(a.y, a.x) - depth_image.at<float>(b.y, b.x))*(depth_image.at<float>(a.y, a.x) - depth_image.at<float>(b.y, b.x)));
 }
 float precision(float tp, float fp) {
 	return tp/(tp + fp);
@@ -74,31 +95,7 @@ float recall(float tp, float fn) {
 	return tp/(tp + fn);
 }
 
-// FIXME: consider removal
-#ifdef DEBUG
-static void onMouse( int event, int x, int y, int, void* )
-{
-    if( event != cv::EVENT_LBUTTONDOWN )
-        return;
-
-    std::cout << "(" << x << ", " << y << ")" << "= " << depth_image.at<float>(y, x) << std::endl;
-    			//<< ", CC: " << mesh.get_cc_index(y*depth_image.cols + x) << std::endl;
-}
-#endif
-
-
-
-
-int compute(int argc, char * argv[]) {
-
-	// Setting the frame range
-	const int start_from_frame = 260;	// For StanfordEval: 1700
-	const int stop_at_frame = 600;		// For StanfordEval: 2400
-
-
-	const int num_attr = pose::kDescriptorSize*pose::kDescriptorSize;
-	const int num_classes = 5;
-
+int compute() {
 	int tps[] = {0, 0, 0, 0, 0};
 	int fps[] = {0, 0, 0, 0, 0};
 	int fns[] = {0, 0, 0, 0, 0};
@@ -210,9 +207,9 @@ std::cout << "(BENCHMARKING) Optical Flow: " << t.duration() << "ms" << std::end
 			}
 
 			aImage1 = aImage2;
-
-			cv::imshow("OF", image_of);
-			//cv::waitKey(0);
+#ifdef DEBUG
+			cv::imshow("Optical flow", image_of);
+#endif
 		}
 		/******************************************/
 
@@ -221,7 +218,6 @@ std::cout << "(BENCHMARKING) Optical Flow: " << t.duration() << "ms" << std::end
 #ifdef BENCHMARK
 t.start();
 #endif
-		//mesher::Mesh mesh(pose::kMeshDistanceThreshold, pose::kNumInterestPoints);
  	 	mesh = mesher::Mesh(pose::kMeshDistanceThreshold, pose::kNumInterestPoints);
 		mesh.compute(depth_image, data.getScaleZ(), image_of);
 #ifdef BENCHMARK
@@ -230,38 +226,30 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 #endif
 		/******************************************/
 
+#ifdef DEBUG
 		cv::Mat segments;
 		depth_image_display.convertTo(segments, CV_8UC3);
 		mesh.colour_mat(segments);
-
-//		std::cout << "Mesh size: " << mesh.size() << std::endl;
-//		std::cout << "Size of the new cloud: " << colour_pcl->size() << std::endl;
+#endif
 
 		std::vector<cv::Point> keypoints, key_orientations;
 		mesh.get_interest_points(keypoints, key_orientations);
 
-		// for prediction step
-//		depth_image.convertTo(depth_image, CV_32F);
-
-
+#ifdef DEBUG
 		// Marking the centroids
 		mesh.mark_centroids(segments, 1.0);
+#endif
 
 		keyframe::Keyframe kframe(depth_image);
-//		cv::imshow("Depth image", depth_image);
-//		cv::waitKey(0);
-
 		for (int i = 0; i < keypoints.size(); i++) {
 			cv::Vec4i orientation;
 			cv::Point centre;
 			cv::Mat patch;
 
-			//std::cerr << "Index: " << i << std::endl;
-
 			centre.x = keypoints[i].x;
 			centre.y = keypoints[i].y;
 
-			// Apply crude outlier filter
+			// Apply crude outlier filter for image boundaries
 			if (centre.x < 5 || centre.x > depth_image.cols - 5
 					|| centre.y < 3 || centre.y > depth_image.rows - 3) continue;
 
@@ -271,12 +259,10 @@ std::cout << "(BENCHMARKING) Creating a mesh: " << t.duration() << "ms" << std::
 			orientation[3] = keypoints[i].y;
 
 			if (!kframe.extract_part(patch, centre, orientation, pose::kDescriptorSize)) {
-				//std::cerr << "Skipping" << std::endl;
+				// Patch extraction was unsuccessful
 				continue;
 			}
 
-			//std::cerr << "Prediction: " << svm.predict(part) << std::endl;
-			//float confidence;
 			classifier::BodyPart body_part;
 
 			/************* SVM prediction *************/
@@ -290,14 +276,15 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 #endif
 			/******************************************/
 
-//			cv::imshow("Interest Point", patch);
-////		cv::imwrite("interest_point.png", part_copy);
-//			cv::waitKey(0);
-
-
+#ifdef DEBUG
+			cv::imshow("Interest Point", patch);
 			mark_body_part(depth_image_display, centre, body_part);
-//			mark_body_part(depth_image_display, cv::Point(key_orientations[i].x, key_orientations[i].y), body_part);
-			//mark_body_part(segments, centre, classifier::RIGHT_FOOT);
+
+			// Mark orienations if needed
+			// mark_body_part(depth_image_display, cv::Point(key_orientations[i].x, key_orientations[i].y), body_part);
+
+			cv::waitKey(0);
+#endif
 
 			cv::Point topleft;
 			topleft.x = centre.x - half_descriptor;
@@ -314,7 +301,6 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 					if (io::DataIOBackend::intersection_ratio(topleft, toplefts[index]) > 0.5 && !detected[index]) {
 						// true positive
 						tps[index]++;
-
 						detected[index] = true;
 					} else {
 						fps[index]++;
@@ -332,8 +318,6 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 		}
 
 		for (int j = 0; j < num_classes; j++) {
-			//mark_body_part(depth_image_display, centres_gt[j], static_cast<classifier::BodyPart>(j + 1));
-
 			if (centres_gt[j].x > 0 && !detected[j]) {
 				fns[j]++;
 			} else if (detected[j]) {
@@ -341,25 +325,26 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 			}
 		}
 
-//		std::cout << "TP = " << tps[0] << " FP = " << fps[0] << " FN = " << fns[0] << std::endl;
-
-		// FIXME: consider removal
+#ifdef DEBUG
 		cv::imshow("Segments", segments);
+		cv::setMouseCallback( "Segments", onMouse, 0 );
+
 		cv::imshow("Body parts", depth_image_display);
-//		//cv::setMouseCallback( "Segments", onMouse, 0 );
-//		cv::imwrite("body_part.png", depth_image_display);
-		cv::imwrite("segments.png", segments);
-//
 		cv::normalize(image_of, image_of, 0, 128, cv::NORM_MINMAX);
 		image_of.convertTo(image_of, CV_8UC1);
-		cv::imwrite("of.png", image_of);
-		cv::waitKey(0);
 
+		// Writing the files if needed
+		// cv::imwrite("body_part.png", depth_image_display);
+		// cv::imwrite("segments.png", segments);
+		// cv::imwrite("of.png", image_of);
+		cv::waitKey(0);
+#endif
 		depth_image_prev = depth_image;
 		frame_idx++;
 	}
 
-	std::cout << "NumOfFrames: " << frame_idx - start_from_frame << std::endl << std::endl;
+	////////////////////////// Printing the results ///////////////////////////
+	std::cout << "Total number of frames: " << frame_idx - start_from_frame << std::endl << std::endl;
 
 	for (int i = 0; i < num_classes; i++) {
 		std::cout << " * " << classifier::BodyPartName[i] << " * " << std::endl;
@@ -404,10 +389,10 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 }
 
 int main(int argc, char * argv[]) {
-	for (float conf = 0.85; conf < 1.f; conf += .05f) {
+	for (float conf = 0.45; conf < 1.f; conf += .05f) {
 		classifier::kConfidenceThreshold = conf;
 		std::cout << "*** " << conf << " ***" << std::endl;
-		compute(argc, argv);
+		compute();
 		std::cout << std::endl << std::endl;
 	}
 }

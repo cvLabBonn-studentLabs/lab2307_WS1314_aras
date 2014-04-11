@@ -17,8 +17,6 @@ class DataIOStanford : public DataIOBackend {
 public:
 	DataIOStanford();
 	bool read_next_frame(cv::Mat& frame_rgb, cv::Mat& frame_depth);
-	/*bool extract_part(const cv::Mat& src, cv::Mat& dst,
-								cv::Point centre, cv::Vec4i orientation, int window_size);*/
 	void get_ground_truth(cv::Point& centre_head,
 											cv::Point& centre_left_hand,
 											cv::Point& centre_right_hand,

@@ -4,13 +4,9 @@
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
-//#include <pcl/point_types.h>
-//#include <pcl/common/projection_matrix.h>
 #include <boost/make_shared.hpp>
 #include "data_io_backend.h"
-#include "ethz/backend.h"
 #include "stanford/backend.h"
-#include "cornell/backend.h"
 #include "bonn/backend.h"
 
 namespace io {
@@ -19,12 +15,6 @@ class DataIO {
 public:
 	DataIO(Dataset d);
 	~DataIO();
-
-//	void read(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
-//				pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_rgb);
-//
-//	bool read(cv::Mat& depth_image,
-//				pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
 
 	bool read(cv::Mat& depth_image);
 
@@ -38,13 +28,6 @@ public:
 
 	float getScaleZ();
 private:
-
-//	void png_to_pointcloud(const cv::Mat& rgb_img,
-//							const cv::Mat& depth_img,
-//							pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud);
-
-//	void png_to_pointcloud(const cv::Mat& depth_img,
-//							pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud);
 
 	Dataset dtype_;
 	boost::shared_ptr<DataIOBackend> backend_;
