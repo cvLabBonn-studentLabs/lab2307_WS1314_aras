@@ -67,7 +67,7 @@ void annotate(std::ostream& ofile, io::DataIO& data) {
 
 int main(int argc, char * argv[]) {
 
-	io::DataIO data(io::Bonn);
+	io::DataIO data(io::StanfordEval);
 	std::string dir;
 	if (argc > 1) {
 		std::string dir = argv[1];

@@ -10,6 +10,9 @@
 
 namespace classifier {
 
+float kConfidenceThreshold = 0.85f;
+char const * BodyPartName[] = {"HEAD", "LEFT_HAND", "RIGHT_HAND", "LEFT_FOOT", "RIGHT_FOOT"};
+
 ClassifierSVM::ClassifierSVM(int num_attr) {
 
 	features_ = (struct svm_node *) malloc((num_attr + 1) * sizeof(struct svm_node));

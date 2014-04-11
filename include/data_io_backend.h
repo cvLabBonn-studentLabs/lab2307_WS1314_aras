@@ -33,13 +33,11 @@ public:
 
 public:
 	static float intersection_ratio(cv::Point topleft1, cv::Point topleft2) {
-		float isc_x = std::max(std::min(topleft1.x + pose::kDescriptorSize,
-										topleft2.x + pose::kDescriptorSize)
+		float isc_x = std::max(std::min(topleft1.x,	topleft2.x) + pose::kDescriptorSize
 								- std::max(topleft1.x, topleft2.x), 0);
 
-		float isc_y = std::max(std::min(std::min(topleft1.y + pose::kDescriptorSize, io::kInputWidth - 1),
-								std::min(topleft2.y + pose::kDescriptorSize, io::kInputWidth - 1))
-						- std::max(topleft1.y, topleft2.y), 0);
+		float isc_y = std::max(std::min(topleft1.y, topleft2.y) + pose::kDescriptorSize
+								- std::max(topleft1.y, topleft2.y), 0);
 
 		return isc_x*isc_y/static_cast<float>(pose::kDescriptorSize*pose::kDescriptorSize);
 	}
@@ -53,6 +51,12 @@ protected:
 								float x1_, float y1_,
 								float x2_, float y2_,
 								classifier::BodyPart id);
+	void extract_positive_part(cv::Mat& frame,
+								std::ofstream& ostream,
+								float x1_, float y1_,
+								float x2_, float y2_,
+								classifier::BodyPart id,
+								bool mirror);
 	void extract_negative_part(cv::Mat& frame,
 								std::ofstream& ostream,
 								std::vector<int> positives);

@@ -9,13 +9,13 @@
 #define MESHER_H_
 
 #include <opencv2/opencv.hpp>
-#include <pcl/point_types.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/io/ply_io.h>
-#include <pcl/kdtree/kdtree_flann.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/surface/gp3.h>
-#include <pcl/filters/voxel_grid.h>
+//#include <pcl/point_types.h>
+//#include <pcl/io/pcd_io.h>
+//#include <pcl/io/ply_io.h>
+//#include <pcl/kdtree/kdtree_flann.h>
+//#include <pcl/features/normal_3d.h>
+//#include <pcl/surface/gp3.h>
+//#include <pcl/filters/voxel_grid.h>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
@@ -61,12 +61,12 @@ namespace mesher {
 
 	typedef boost::graph_traits < Graph >::vertex_descriptor vertex_descriptor;
 
-	void process(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
-					pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out);
-
-	void downsample(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
-						pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_out,
-						float cell_size);
+//	void process(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
+//					pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_out);
+//
+//	void downsample(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
+//						pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_out,
+//						float cell_size);
 
 	class Mesh {
 	public:

@@ -91,6 +91,15 @@ void DataIOBackend::extract_positive_part(cv::Mat& frame,
 											float x1_, float y1_,
 											float x2_, float y2_,
 											classifier::BodyPart id) {
+	extract_positive_part(frame, ostream, x1_, y1_, x2_, y2_, id, false);
+}
+
+void DataIOBackend::extract_positive_part(cv::Mat& frame,
+											std::ofstream& ostream,
+											float x1_, float y1_,
+											float x2_, float y2_,
+											classifier::BodyPart id,
+											bool mirror) {
 	cv::Vec4i orientation;
 	cv::Point centre;
 	cv::Mat part;
@@ -116,12 +125,18 @@ void DataIOBackend::extract_positive_part(cv::Mat& frame,
 		return;
 	}
 
-//	cv::imshow("Part", part);
-//	cv::waitKey(0);
-
 	std::stringstream line;
 	image_to_string(part, line);
 	ostream << id << line.str() << "\n";
+
+	if (mirror) {
+		cv::Mat part_mirror;
+		cv::flip(part, part_mirror, 1);
+
+		std::stringstream line;
+		image_to_string(part_mirror, line);
+		ostream << id << line.str() << "\n";
+	}
 }
 
 void DataIOBackend::extract_negative_part(cv::Mat& frame,
@@ -138,8 +153,8 @@ void DataIOBackend::extract_negative_part(cv::Mat& frame,
 		bool in_collision = false;
 		for (std::vector<int>::iterator it = positives.begin();
 					it != positives.end(); ) {
-			int pos_x = *it++;
-			int pos_y = *it++;
+			int pos_x = *it++ - pose::kDescriptorSize/2;
+			int pos_y = *it++ - pose::kDescriptorSize/2;
 
 			if (DataIOBackend::intersection_ratio(topleft, cv::Point(pos_x, pos_y)) > 0.5f) {
 				in_collision = true;

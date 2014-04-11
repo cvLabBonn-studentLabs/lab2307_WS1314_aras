@@ -57,7 +57,7 @@ namespace io {
 			return read_next_frame(frame_rgb, frame_depth);
 		}
 
-		std::cout << "Reading sequence " << seq_num_ << " frame " << frame_num_ << std::endl;
+		//std::cout << "Reading sequence " << seq_num_ << " frame " << frame_num_ << std::endl;
 		cv::Mat frame = cv::imread(filename);
 
 		assert(frame.cols == 640 && frame.rows == 480);
@@ -92,8 +92,8 @@ namespace io {
 		}
 
 		// HEAD
-		centre_truth_head.x = ground_truth_[6];
-		centre_truth_head.y = ground_truth_[7];
+		centre_truth_head.x = ground_truth_[4];
+		centre_truth_head.y = ground_truth_[5];
 
 		// LEFT HAND
 		centre_truth_left_hand.x = ground_truth_[0];
@@ -112,6 +112,9 @@ namespace io {
 		centre_truth_right_foot.y = ground_truth_[17];
 
 		frame_num_++;
+
+		cv::normalize(frame_depth, frame_depth, 0.f, 1.f, cv::NORM_MINMAX);
+
 		return true;
 	}
 
@@ -167,7 +170,7 @@ namespace io {
 				extract_positive_part(depth_img, data,
 										ground_truth_[6], ground_truth_[7],
 										ground_truth_[4], ground_truth_[5],
-										classifier::HEAD);
+										classifier::HEAD, true);
 
 				positive_centres.push_back(ground_truth_[6]);
 				positive_centres.push_back(ground_truth_[7]);
@@ -178,7 +181,7 @@ namespace io {
 				extract_positive_part(depth_img, data,
 						ground_truth_[2], ground_truth_[3],
 						ground_truth_[0], ground_truth_[1],
-						classifier::LEFT_HAND);
+						classifier::LEFT_HAND, true);
 
 				positive_centres.push_back(ground_truth_[0]);
 				positive_centres.push_back(ground_truth_[1]);
@@ -189,7 +192,7 @@ namespace io {
 				extract_positive_part(depth_img, data,
 						ground_truth_[10], ground_truth_[11],
 						ground_truth_[8], ground_truth_[9],
-						classifier::RIGHT_HAND);
+						classifier::RIGHT_HAND, true);
 
 				positive_centres.push_back(ground_truth_[8]);
 				positive_centres.push_back(ground_truth_[9]);
@@ -200,7 +203,7 @@ namespace io {
 				extract_positive_part(depth_img, data,
 						ground_truth_[14], ground_truth_[15],
 						ground_truth_[12], ground_truth_[13],
-						classifier::LEFT_FOOT);
+						classifier::LEFT_FOOT, true);
 
 				positive_centres.push_back(ground_truth_[12]);
 				positive_centres.push_back(ground_truth_[13]);
@@ -211,13 +214,13 @@ namespace io {
 				extract_positive_part(depth_img, data,
 						ground_truth_[18], ground_truth_[19],
 						ground_truth_[16], ground_truth_[17],
-						classifier::RIGHT_FOOT);
+						classifier::RIGHT_FOOT, true);
 
 				positive_centres.push_back(ground_truth_[16]);
 				positive_centres.push_back(ground_truth_[17]);
 			}
 
-			for (int j = 0; j < 5; j++) {
+			for (int j = 0; j < 10; j++) {
 				extract_negative_part(depth_img, data, positive_centres);
 			}
 		}

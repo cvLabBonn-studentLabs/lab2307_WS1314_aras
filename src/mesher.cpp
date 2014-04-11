@@ -10,8 +10,8 @@
 
 
 //#define BENCHMARK 1
-#define DEBUG 1
-#define CENTROIDS_UNIFORM 20
+//#define DEBUG 1
+//#define CENTROIDS_UNIFORM 40
 
 #ifdef BENCHMARK
 #include "timer.h"
@@ -232,10 +232,12 @@ std::cout << "(BENCHMARKING) Finding centroids: " << t.duration() << "ms" << std
 t.start();
 #endif
 
+	int num_of_big_clusters = 0;
     for (std::vector<XYZPoint>::iterator it = centroids_.begin();
     		it != centroids_.end(); ++it) {
 
     	if (it->count < kMinMeshSize) continue;
+    	num_of_big_clusters++;
 
 		std::vector<vertex_descriptor> p(boost::num_vertices(graph_));
 		std::vector<int> d(boost::num_vertices(graph_));
@@ -261,6 +263,11 @@ t.start();
 #ifndef	CENTROIDS_UNIFORM
 			assert(components_[max_weight_vertex] == components_[it->index]);
 #endif
+			if (it->index == max_weight_vertex) {
+				// In case it's a one-vertex cluster
+				break;
+			}
+
 			// adding a zero-weight edge
 			boost::add_edge(it->index, max_weight_vertex, 0, graph_);
 			interest_points_.push_back(max_weight_vertex);
@@ -274,6 +281,10 @@ t.start();
 			interest_points_o_.push_back(parent);
 		}
     }
+
+#ifdef DEBUG
+    std::cerr << "The number of big clusters: " << num_of_big_clusters << std::endl;
+#endif
 
 #ifdef BENCHMARK
 t.stop();
@@ -578,7 +589,7 @@ void Mesh::mark_centroids(cv::Mat& image, float colour) {
 		int y = cloud_points_[it->index].y;
 
 
-		cv::circle(image, cv::Point(x, y), 3.0, cv::Scalar(255, 255, 255), -1, 8);
+		cv::circle(image, cv::Point(x, y), 2.0, cv::Scalar(0, 0, 255), -1, 8);
 
 		//std::cerr << "Centroid: [" << *it << "] X: " << x << " Y: " << y << " Z: " << cloud_->points[*it].z << std::endl;
 	}
@@ -592,10 +603,6 @@ void Mesh::get_interest_points(std::vector<cv::Point>& points, std::vector<cv::P
 		p.y = cloud_points_[interest_points_[i]].y;
 		points.push_back(p);
 
-//		std::cerr << "IP: [" << i << "] X: " << p.x <<
-//					" Y: " << p.y <<
-//					" Z: " << cloud_->points[interest_points_[i]].z << std::endl;
-
 		cv::Point o;
 		o.x = cloud_points_[interest_points_o_[i]].x;
 		o.y = cloud_points_[interest_points_o_[i]].y;
@@ -603,15 +610,15 @@ void Mesh::get_interest_points(std::vector<cv::Point>& points, std::vector<cv::P
 	}
 }
 
-void downsample(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
-					pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_out,
-					float cell_size) {
-	  // Create the filtering object
-	  pcl::VoxelGrid<pcl::PointXYZ> sor;
-	  sor.setInputCloud(cloud_in);
-	  sor.setLeafSize(cell_size, cell_size, cell_size);
-	  sor.filter(*cloud_out);
-}
+//void downsample(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in,
+//					pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_out,
+//					float cell_size) {
+//	  // Create the filtering object
+//	  pcl::VoxelGrid<pcl::PointXYZ> sor;
+//	  sor.setInputCloud(cloud_in);
+//	  sor.setLeafSize(cell_size, cell_size, cell_size);
+//	  sor.filter(*cloud_out);
+//}
 
 /*void process(pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud_in,
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr &cloud_out) {

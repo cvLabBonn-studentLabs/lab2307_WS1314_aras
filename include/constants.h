@@ -9,11 +9,11 @@
 #define CONSTANTS_H_
 
 namespace opflow {
-	const bool ON = false;
+	const bool ON = true;
 }
 
 namespace classifier {
-	const float kConfidenceThreshold = 0.5f;
+	extern float kConfidenceThreshold;
 }
 
 namespace io {
@@ -35,7 +35,7 @@ namespace pose {
 	const float kOrientationDelta = 8;
 
 	const int kDescriptorSize = 41;
-	const int kNumInterestPoints = 40;
+	const int kNumInterestPoints = 35;
 
 	const int kConnectedComponentMinSize = 100;
 

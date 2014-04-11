@@ -31,7 +31,7 @@ private:
 	int to_x(float x_);
 	int to_y(float y_);
 
-	static const std::string kTrainingDataPath;
+	static const std::string kPath;
 };
 
 }

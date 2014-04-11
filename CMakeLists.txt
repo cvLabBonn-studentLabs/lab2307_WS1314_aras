@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 
 project(POSE_ESTIMATION)
 
-find_package(PCL 1.3 REQUIRED COMPONENTS common io visualization search segmentation features filters surface kdtree)
+#find_package(PCL 1.3 REQUIRED COMPONENTS common io visualization search segmentation features filters surface kdtree)
 
 ################################
 # OpticalFlow Library
@@ -22,7 +22,6 @@ set(SRC_FILES src/keyframe.cpp
               src/stanford/backend.cpp
               src/bonn/backend.cpp
               src/main.cpp
-              src/segmentation.cpp
               src/classifier_svm.cpp
               src/timer.cpp
               src/opflow.cpp
@@ -33,24 +32,24 @@ set(MESH_FILES src/mesher.cpp src/timer.cpp)
 
 set(LIBRARIES opencv_core
 		opencv_highgui
-		pcl_visualization
+#		pcl_visualization
 		boost_system
 		boost_filesystem
 		opencv_imgproc
-		pcl_common
-		pcl_search
-		pcl_segmentation
-		pcl_features
-		pcl_filters
-		pcl_io
-		pcl_surface
-		pcl_kdtree
+#		pcl_common
+#		pcl_search
+#		pcl_segmentation
+#		pcl_features
+#		pcl_filters
+#		pcl_io
+#		pcl_surface
+#		pcl_kdtree
 		gtest
 		svm
 		${LDOF})
 
 include_directories(include
-	${PCL_INCLUDE_DIRS}
+#	${PCL_INCLUDE_DIRS}
 	${CMAKE_INCLUDE_PATH}
 	libsvm-3.17
 	tracking

@@ -52,32 +52,32 @@ namespace io {
 		return backend_->getScaleZ();
 	}
 
-	void DataIO::read(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
-						pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_rgb) {
+//	void DataIO::read(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud,
+//						pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_rgb) {
+//
+//		cv::Mat rgb_img, depth_img;
+//		backend_->read_next_frame(rgb_img, depth_img);
+//
+//		if (depth_img.cols != 0) {
+//			if (rgb_img.cols != 0) {
+//				png_to_pointcloud(rgb_img, depth_img, cloud_rgb);
+//			} else {
+//				png_to_pointcloud(depth_img, cloud);
+//			}
+//		}
+//	}
 
-		cv::Mat rgb_img, depth_img;
-		backend_->read_next_frame(rgb_img, depth_img);
-
-		if (depth_img.cols != 0) {
-			if (rgb_img.cols != 0) {
-				png_to_pointcloud(rgb_img, depth_img, cloud_rgb);
-			} else {
-				png_to_pointcloud(depth_img, cloud);
-			}
-		}
-	}
-
-	bool DataIO::read(cv::Mat& depth_img,
-						pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) {
-
-		cv::Mat rgb_img_dummy;
-		if (backend_->read_next_frame(rgb_img_dummy, depth_img)) {
-			png_to_pointcloud(depth_img, cloud);
-			return true;
-		}
-
-		return false;
-	}
+//	bool DataIO::read(cv::Mat& depth_img,
+//						pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) {
+//
+//		cv::Mat rgb_img_dummy;
+//		if (backend_->read_next_frame(rgb_img_dummy, depth_img)) {
+//			png_to_pointcloud(depth_img, cloud);
+//			return true;
+//		}
+//
+//		return false;
+//	}
 
 	bool DataIO::read(cv::Mat& depth_img) {
 
@@ -92,26 +92,26 @@ namespace io {
 		backend_->extract_parts();
 	}
 
-	void DataIO::png_to_pointcloud(const cv::Mat& depth_img,
-									pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) {
-		assert(depth_img.type() == CV_32F);
-
-		for (int row = 0; row < depth_img.rows; ++row) {
-		    const float* depth_p = depth_img.ptr<float>(row);
-
-		    for (int col = 0; col < depth_img.cols; ++col) {
-		        if (*depth_p != 0) {
-					pcl::PointXYZ point;
-
-					point.x = static_cast<float>(col);
-					point.y = static_cast<float>(row);
-					point.z = (*depth_p++)*ALPHA_DEPTH;
-
-					cloud->push_back(point);
-		        }
-		    }
-		}
-	}
+//	void DataIO::png_to_pointcloud(const cv::Mat& depth_img,
+//									pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) {
+//		assert(depth_img.type() == CV_32F);
+//
+//		for (int row = 0; row < depth_img.rows; ++row) {
+//		    const float* depth_p = depth_img.ptr<float>(row);
+//
+//		    for (int col = 0; col < depth_img.cols; ++col) {
+//		        if (*depth_p != 0) {
+//					pcl::PointXYZ point;
+//
+//					point.x = static_cast<float>(col);
+//					point.y = static_cast<float>(row);
+//					point.z = (*depth_p++)*ALPHA_DEPTH;
+//
+//					cloud->push_back(point);
+//		        }
+//		    }
+//		}
+//	}
 
 	void DataIO::get_ground_truth(cv::Point& centre_head,
 											cv::Point& centre_left_hand,
@@ -122,61 +122,61 @@ namespace io {
 	}
 
 
-	void DataIO::png_to_pointcloud(const cv::Mat& rgb_img,
-									const cv::Mat& depth_img,
-									pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud) {
-
-		// Fix the size mismatch between RGB and depth image
-		assert(rgb_img.size() == depth_img.size());
-		assert(rgb_img.type() == CV_8UC3);
-		assert(depth_img.type() == CV_8UC1);
-
-		double minVal, maxVal;
-		cv::minMaxLoc(depth_img, &minVal, &maxVal);
-
-		cloud->resize(cv::countNonZero(depth_img));
-
-		float rgb_2_depth_width = static_cast<float>(rgb_img.cols) / depth_img.cols;
-		float rgb_2_depth_height = static_cast<float>(rgb_img.rows) / depth_img.rows;
-
-		const float alpha_depth = 2.0;
-		for (int row = 0; row < depth_img.rows; ++row) {
-		    const uchar* depth_p = depth_img.ptr<uchar>(row);
-
-		    int row_rgb = static_cast<int>(round(row * rgb_2_depth_height));
-		    const uchar* rgb_p = rgb_img.ptr(row_rgb);
-
-		    for (int col = 0; col < depth_img.cols; ++col) {
-		        if (*depth_p != 0) {
-		        	const uchar* rgb_pp = rgb_p + 3*static_cast<int>(round(col * rgb_2_depth_width));
-
-		        	uchar depth = *depth_p;
-					uchar b = *rgb_pp++;
-					uchar g = *rgb_pp++;
-					uchar r = *rgb_pp++;
-
-					pcl::PointXYZRGB point;
-
-					point.x = static_cast<float>(col);
-					point.y = static_cast<float>(row);
-					point.z = depth*ALPHA_DEPTH;
-
-					// Fill in color
-					RGBValue color;
-					color.Red   = r;
-					color.Green = g;
-					color.Blue  = b;
-					color.Alpha = 0;
-					point.rgb = color.float_value;
-
-					cloud->push_back(point);
-		        }
-
-		        depth_p++;
-		    }
-		}
-
-	}
+//	void DataIO::png_to_pointcloud(const cv::Mat& rgb_img,
+//									const cv::Mat& depth_img,
+//									pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud) {
+//
+//		// Fix the size mismatch between RGB and depth image
+//		assert(rgb_img.size() == depth_img.size());
+//		assert(rgb_img.type() == CV_8UC3);
+//		assert(depth_img.type() == CV_8UC1);
+//
+//		double minVal, maxVal;
+//		cv::minMaxLoc(depth_img, &minVal, &maxVal);
+//
+//		cloud->resize(cv::countNonZero(depth_img));
+//
+//		float rgb_2_depth_width = static_cast<float>(rgb_img.cols) / depth_img.cols;
+//		float rgb_2_depth_height = static_cast<float>(rgb_img.rows) / depth_img.rows;
+//
+//		const float alpha_depth = 2.0;
+//		for (int row = 0; row < depth_img.rows; ++row) {
+//		    const uchar* depth_p = depth_img.ptr<uchar>(row);
+//
+//		    int row_rgb = static_cast<int>(round(row * rgb_2_depth_height));
+//		    const uchar* rgb_p = rgb_img.ptr(row_rgb);
+//
+//		    for (int col = 0; col < depth_img.cols; ++col) {
+//		        if (*depth_p != 0) {
+//		        	const uchar* rgb_pp = rgb_p + 3*static_cast<int>(round(col * rgb_2_depth_width));
+//
+//		        	uchar depth = *depth_p;
+//					uchar b = *rgb_pp++;
+//					uchar g = *rgb_pp++;
+//					uchar r = *rgb_pp++;
+//
+//					pcl::PointXYZRGB point;
+//
+//					point.x = static_cast<float>(col);
+//					point.y = static_cast<float>(row);
+//					point.z = depth*ALPHA_DEPTH;
+//
+//					// Fill in color
+//					RGBValue color;
+//					color.Red   = r;
+//					color.Green = g;
+//					color.Blue  = b;
+//					color.Alpha = 0;
+//					point.rgb = color.float_value;
+//
+//					cloud->push_back(point);
+//		        }
+//
+//		        depth_p++;
+//		    }
+//		}
+//
+//	}
 
 	bool DataIO::load_float_image(std::string filename, cv::Mat& output) {
 

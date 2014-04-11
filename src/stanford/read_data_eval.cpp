@@ -23,7 +23,8 @@ float           amp_lo = 4000;
 float           x_angle = 0,
                 y_angle = 0;
 int             cur_file=0;
-char           *data_set_dir = "data/stanford/cvpr10/data";
+std::string     data_set_dir = "data/stanford/cvpr10/data";
+int 			id = 0;
 //extern float    color_map[][3];
 //extern int      color_map_size;
 
@@ -159,16 +160,15 @@ bool read_frame() {
 }
 
 bool next_file() {
-  static int id = 0;
   ++id;
   char buf[1024];
-  sprintf(buf, "%s/real01_%d.cal.bin", data_set_dir, id);
-  printf("trying to open: %s\n",buf);
+  sprintf(buf, "%s/real01_%d.cal.bin", data_set_dir.c_str(), id);
+  //printf("trying to open: %s\n",buf);
   seq_ifs.clear();
   if(seq_ifs.is_open()) seq_ifs.close();
   seq_ifs.open(buf, ifstream::binary);
   if(!seq_ifs) {
-    printf("ERROR: could not open: %s\n", buf);
+    //printf("ERROR: could not open: %s\n", buf);
     return false;
   }
   read_frame();

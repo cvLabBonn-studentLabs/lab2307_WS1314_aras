@@ -16,6 +16,7 @@
 namespace classifier {
 
 enum BodyPart { ZERO, HEAD, LEFT_HAND, RIGHT_HAND, LEFT_FOOT, RIGHT_FOOT };
+extern char const * BodyPartName[];
 
 class ClassifierSVM {
 public:
