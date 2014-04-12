@@ -8,7 +8,11 @@ Testing/
 .settings/
 optflow/
 scripts/
-data/
+data/21x21
+data/31x31
+data/51x51
+data/61x61
+
 
 .project
 .pydevproject
@@ -16,6 +20,4 @@ data/
 Makefile
 
 *.cmake
-*.png
 *.jpg
-*.txt
