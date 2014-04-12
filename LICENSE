@@ -2,7 +2,7 @@
  * Software License Agreement (BSD License)
  *
  *  Copyright (c) 2014, Computer Science Institute III, University of Bonn
- *  Author: Nikita Araslanov, 22.03.2014
+ *  Author: Nikita Araslanov, 12.04.2014
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -34,27 +34,3 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *
  */
-
-#ifndef KEYFRAME_H_
-#define KEYFRAME_H_
-
-#include <opencv2/opencv.hpp>
-
-namespace keyframe {
-
-class Keyframe {
-public:
-	Keyframe(cv::Mat src);
-	~Keyframe();
-	bool extract_part(cv::Mat& dst,
-						cv::Point centre,
-						cv::Vec4i orientation,
-						int window_size);
-private:
-	cv::Mat keyframe_;
-};
-
-}
-
-
-#endif /* KEYFRAME_H_ */

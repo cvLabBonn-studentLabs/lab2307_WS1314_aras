@@ -1,3 +1,41 @@
+/*
+ * Software License Agreement (BSD License)
+ *
+ *  Copyright (c) 2014, Computer Science Institute III, University of Bonn
+ *  Author: Nikita Araslanov, 12.04.2014
+ *  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of University of Bonn, Computer Science Institute
+ *     III nor the names of its contributors may be used to endorse or
+ *     promote products derived from this software without specific
+ *     prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+
+
 #include "data_io.h"
 #include "mesher.h"
 #include "constants.h"
@@ -32,7 +70,7 @@ timer::Timer t;
 #endif
 
 // FIXME: consider removal
-#ifdef DEBUG
+
 void mark_body_part(cv::Mat& image, cv::Point centre, classifier::BodyPart body_part) {
 
 //	std::cout << "Marking BP: " << body_part << " : " << centre << std::endl;
@@ -71,6 +109,7 @@ void mark_body_part(cv::Mat& image, cv::Point centre, classifier::BodyPart body_
 	}
 }
 
+#ifdef DEBUG
 static void onMouse( int event, int x, int y, int, void* )
 {
     if( event != cv::EVENT_LBUTTONDOWN )
@@ -276,10 +315,10 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 #endif
 			/******************************************/
 
-#ifdef DEBUG
-			cv::imshow("Interest Point", patch);
 			mark_body_part(depth_image_display, centre, body_part);
 
+#ifdef DEBUG
+			cv::imshow("Interest Point", patch);
 			// Mark orienations if needed
 			// mark_body_part(depth_image_display, cv::Point(key_orientations[i].x, key_orientations[i].y), body_part);
 
@@ -325,11 +364,13 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 			}
 		}
 
+		// Displaying the frames
+		cv::imshow("Body parts", depth_image_display);
+		cv::waitKey(1);
+
 #ifdef DEBUG
 		cv::imshow("Segments", segments);
 		cv::setMouseCallback( "Segments", onMouse, 0 );
-
-		cv::imshow("Body parts", depth_image_display);
 		cv::normalize(image_of, image_of, 0, 128, cv::NORM_MINMAX);
 		image_of.convertTo(image_of, CV_8UC1);
 
@@ -391,7 +432,7 @@ std::cout << "(BENCHMARKING) SVM prediction: " << t.duration() << "ms" << std::e
 int main(int argc, char * argv[]) {
 	for (float conf = 0.45; conf < 1.f; conf += .05f) {
 		classifier::kConfidenceThreshold = conf;
-		std::cout << "*** " << conf << " ***" << std::endl;
+		std::cout << "*** Classifier confidence value: " << conf << " ***" << std::endl;
 		compute();
 		std::cout << std::endl << std::endl;
 	}
