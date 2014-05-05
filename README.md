@@ -19,6 +19,7 @@ To build the project:
 ```
 cd <project_root>
 mkdir Release
+cd Release
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
